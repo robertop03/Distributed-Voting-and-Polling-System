@@ -1,4 +1,3 @@
-# Pydantic models
 from typing import Dict
 from pydantic import BaseModel, Field
 
@@ -10,8 +9,8 @@ class VoteIn(BaseModel):
 
 class CounterUpdate(BaseModel):
     """
-    Idempotent update: it carries the new value of one component of the G-Counter.
-    Receiving the same update multiple times is safe because we merge with max().
+    Idempotent update: carries the new value of one component of the G-Counter.
+    Receiver merges with max().
     """
     poll_id: str
     option: str
@@ -25,3 +24,11 @@ class PollCRDTState(BaseModel):
     counts[option][node_id] = value
     """
     counts: Dict[str, Dict[str, int]]
+
+
+class ClusterCRDTState(BaseModel):
+    """
+    Full CRDT state for all polls:
+    polls[poll_id] = PollCRDTState
+    """
+    polls: Dict[str, PollCRDTState]
