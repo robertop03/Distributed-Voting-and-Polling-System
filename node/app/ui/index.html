@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Distributed Voting UI</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Distributed Voting & Polling</h1>
+    </header>
+
+    <section class="controls card">
+      <div class="muted"> Connected to: <code id="currentOrigin"></code> </div>
+
+      <div class="grid">
+        <label>
+          Poll ID
+          <input id="pollId" value="poll1" />
+        </label>
+
+        <label>
+          Option
+          <input id="option" value="A" maxlength="8" />
+        </label>
+
+        <div class="buttons">
+          <button id="voteBtn">Vote</button>
+        </div>
+
+        <div class="statusline">
+          <span id="lastUpdate" class="muted"></span>
+          <span id="error" class="error"></span>
+        </div>
+      </div>
+    </section>
+
+    <main class="grid2">
+      <section class="card">
+        <div class="card-header">
+          <h2>Poll results</h2>
+          <span class="muted">GET <code>/poll/&lt;poll_id&gt;</code></span>
+        </div>
+        <table class="table" id="pollTable">
+          <thead
+            ><tr><th>Option</th><th>Count</th></tr></thead
+          >
+          <tbody></tbody>
+        </table>
+        <details>
+          <summary class="muted">Raw JSON</summary>
+          <pre id="pollRaw" class="pre"></pre>
+        </details>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Peer status</h2>
+          <span class="muted">GET <code>/status</code></span>
+        </div>
+        <table class="table" id="statusTable">
+          <thead
+            ><tr><th>Peer</th><th>Status</th></tr></thead
+          >
+          <tbody></tbody>
+        </table>
+        <details>
+          <summary class="muted">Raw JSON</summary>
+          <pre id="statusRaw" class="pre"></pre>
+        </details>
+      </section>
+    </main>
+
+    <footer class="footer muted"> Distributed project, developed by Roberto Pisu. </footer>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
