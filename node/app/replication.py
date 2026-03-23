@@ -41,6 +41,26 @@ def internal_counter_update(upd: CounterUpdate):
     return {"ok": True, "changed": changed, "node": NODE_ID}
 
 
+# ---- cluster-wide endpoints: use unambiguous names ----
+
+@router.get("/internal/cluster-state")
+def internal_cluster_state() -> ClusterCRDTState:
+    return export_cluster_state()
+
+
+@router.post("/internal/cluster-merge")
+def internal_cluster_merge(other: ClusterCRDTState):
+    updates = extract_new_updates_from_cluster_state(other)
+
+    for upd in updates:
+        append_wal_update(upd)
+        apply_update(upd)
+
+    return {"ok": True, "applied_updates": len(updates), "node": NODE_ID}
+
+
+# ---- poll-specific endpoints ----
+
 @router.get("/internal/state/{poll_id}")
 def internal_state(poll_id: str) -> PollCRDTState:
     return export_poll_state(poll_id)
@@ -85,26 +105,7 @@ async def internal_sync(poll_id: str):
     raise HTTPException(status_code=503, detail="No peer reachable for sync")
 
 
-@router.get("/internal/state/all")
-def internal_state_all() -> ClusterCRDTState:
-    return export_cluster_state()
-
-
-@router.post("/internal/merge/all")
-def internal_merge_all(other: ClusterCRDTState):
-    updates = extract_new_updates_from_cluster_state(other)
-
-    for upd in updates:
-        append_wal_update(upd)
-        apply_update(upd)
-
-    return {"ok": True, "applied_updates": len(updates), "node": NODE_ID}
-
-
 async def anti_entropy_loop() -> None:
-    """
-    Periodically pull full CRDT state from a random peer and merge it durably.
-    """
     if not PEERS:
         return
 
@@ -112,7 +113,8 @@ async def anti_entropy_loop() -> None:
         while True:
             peer = random.choice(PEERS)
             try:
-                resp = await client.get(f"{peer}/internal/state/all")
+                resp = await client.get(f"{peer}/internal/cluster-state")
+                resp.raise_for_status()
                 other = ClusterCRDTState(**resp.json())
 
                 updates = extract_new_updates_from_cluster_state(other)
@@ -120,7 +122,7 @@ async def anti_entropy_loop() -> None:
                     append_wal_update(upd)
                     apply_update(upd)
 
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[anti-entropy] failed from {peer}: {e}")
 
             await asyncio.sleep(ANTI_ENTROPY_INTERVAL)
