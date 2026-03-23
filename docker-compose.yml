@@ -6,8 +6,12 @@ services:
       - PORT=8001
       - PEERS=http://node2:8002,http://node3:8003
       - ANTI_ENTROPY_INTERVAL=3
+      - CHECKPOINT_INTERVAL=10
+      - DATA_DIR=/data
     ports:
       - "8001:8001"
+    volumes:
+      - node1_data:/data
 
   node2:
     build: ./node
@@ -16,8 +20,12 @@ services:
       - PORT=8002
       - PEERS=http://node1:8001,http://node3:8003
       - ANTI_ENTROPY_INTERVAL=3
+      - CHECKPOINT_INTERVAL=10
+      - DATA_DIR=/data
     ports:
       - "8002:8002"
+    volumes:
+      - node2_data:/data
 
   node3:
     build: ./node
@@ -26,5 +34,14 @@ services:
       - PORT=8003
       - PEERS=http://node1:8001,http://node2:8002
       - ANTI_ENTROPY_INTERVAL=3
+      - CHECKPOINT_INTERVAL=10
+      - DATA_DIR=/data
     ports:
       - "8003:8003"
+    volumes:
+      - node3_data:/data
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:

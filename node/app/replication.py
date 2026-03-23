@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
+from .storage import append_wal_update
 from .state import (
     merge_update,
     export_poll_state,
@@ -30,11 +31,22 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
 
 @router.post("/internal/counter/update")
 def internal_counter_update(upd: CounterUpdate):
-    changed = merge_update(upd)
+    # verifichiamo se serve davvero
+    # piccolo check inline
+    from .state import g_counter, ensure_option
+
+    ensure_option(upd.poll_id, upd.option)
+    prev = g_counter[upd.poll_id][upd.option].get(upd.node_id, 0)
+    changed = upd.value > prev
+
+    if changed:
+        append_wal_update(upd)
+        merge_update(upd)
+
     return {"ok": True, "changed": changed, "node": NODE_ID}
 
 
-# ----------- per-poll sync (rimane utile) -----------
+# per-poll sync
 
 @router.get("/internal/state/{poll_id}")
 def internal_state(poll_id: str) -> PollCRDTState:

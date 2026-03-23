@@ -20,12 +20,14 @@ def ensure_option(poll_id: str, option: str) -> None:
     if option not in g_counter[poll_id]:
         g_counter[poll_id][option] = {}
 
-
-def local_increment(poll_id: str, option: str) -> CounterUpdate:
+def build_local_increment_update(poll_id: str, option: str) -> CounterUpdate:
     ensure_option(poll_id, option)
     current = g_counter[poll_id][option].get(NODE_ID, 0) + 1
-    g_counter[poll_id][option][NODE_ID] = current
     return CounterUpdate(poll_id=poll_id, option=option, node_id=NODE_ID, value=current)
+
+
+def apply_update(upd: CounterUpdate) -> bool:
+    return merge_update(upd)
 
 
 def merge_update(upd: CounterUpdate) -> bool:
@@ -70,3 +72,19 @@ def query_poll_counts(poll_id: str) -> Dict[str, int]:
     for opt, nodes in g_counter[poll_id].items():
         result[opt] = sum(nodes.values())
     return result
+
+
+def replace_cluster_state(other: ClusterCRDTState) -> None:
+    """
+    Replace in-memory state with a recovered snapshot.
+    Used only during startup recovery.
+    """
+    global g_counter
+    new_state: Dict[str, Dict[str, Dict[str, int]]] = {}
+
+    for poll_id, poll_state in other.polls.items():
+        new_state[poll_id] = {}
+        for opt, nodes in poll_state.counts.items():
+            new_state[poll_id][opt] = dict(nodes)
+
+    g_counter = new_state
