@@ -12,9 +12,13 @@ from .state import (
     apply_update,
     query_poll_counts,
     replace_cluster_state,
-    merge_update,
-    export_cluster_state,
 )
+from .replication import (
+    router as replication_router,
+    replicate_update_to_peers,
+    anti_entropy_loop,
+)
+from .failure import router as failure_router, heartbeat_loop
 from .storage import (
     ensure_storage,
     load_checkpoint,
@@ -23,16 +27,12 @@ from .storage import (
     truncate_wal,
     append_wal_update,
 )
-from .replication import (
-    router as replication_router,
-    replicate_update_to_peers,
-    anti_entropy_loop,
-)
-from .failure import router as failure_router, heartbeat_loop
+
 
 async def checkpoint_loop():
     while True:
         await asyncio.sleep(CHECKPOINT_INTERVAL)
+        from .state import export_cluster_state
         state = export_cluster_state()
         write_checkpoint(state)
         truncate_wal()
@@ -42,20 +42,20 @@ async def checkpoint_loop():
 async def lifespan(app: FastAPI):
     ensure_storage()
 
-    # recovery
+    # Recovery: checkpoint + WAL replay
     snapshot = load_checkpoint()
     replace_cluster_state(snapshot)
 
     wal_updates = load_wal_updates()
     for upd in wal_updates:
-        merge_update(upd)
+        apply_update(upd)
 
-    # background tasks
     asyncio.create_task(heartbeat_loop())
     asyncio.create_task(anti_entropy_loop())
     asyncio.create_task(checkpoint_loop())
 
     yield
+
 
 app = FastAPI(
     title=f"Distributed Voting Node ({NODE_ID})",
@@ -67,9 +67,11 @@ app.include_router(failure_router)
 
 app.mount("/ui", StaticFiles(directory="app/ui", html=True), name="ui")
 
+
 @app.get("/")
 def root():
     return RedirectResponse(url="/ui/")
+
 
 @app.post("/vote")
 async def vote(v: VoteIn):
