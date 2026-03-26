@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
+import threading
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -29,13 +30,17 @@ from .storage import (
 )
 
 
+durability_lock = threading.RLock()
+
 async def checkpoint_loop():
     while True:
         await asyncio.sleep(CHECKPOINT_INTERVAL)
         from .state import export_cluster_state
-        state = export_cluster_state()
-        write_checkpoint(state)
-        truncate_wal()
+
+        with durability_lock:
+            state = export_cluster_state()
+            write_checkpoint(state)
+            truncate_wal()
 
 
 @asynccontextmanager
@@ -75,9 +80,11 @@ def root():
 
 @app.post("/vote")
 async def vote(v: VoteIn):
-    upd = build_local_increment_update(v.poll_id, v.option)
-    append_wal_update(upd)
-    apply_update(upd)
+    with durability_lock:
+        upd = build_local_increment_update(v.poll_id, v.option)
+        append_wal_update(upd)
+        apply_update(upd)
+
     await replicate_update_to_peers(upd)
     return {"ok": True, "node": NODE_ID, "update": upd.model_dump()}
 

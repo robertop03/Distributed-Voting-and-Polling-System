@@ -144,3 +144,9 @@ Validates:
 - Docker volumes are used for persistence; therefore:
   - `docker compose restart` → keeps data
   - `docker compose down -v` → resets everything
+
+## Platform Note
+
+The current test suite is implemented in PowerShell and has been developed and verified on Windows.
+
+To make the tests cross-platform, equivalent Bash or Python integration scripts could be provided for Linux/macOS environments.

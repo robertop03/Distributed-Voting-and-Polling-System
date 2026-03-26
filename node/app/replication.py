@@ -14,6 +14,7 @@ from .state import (
     extract_new_updates_from_cluster_state,
 )
 from .storage import append_wal_update
+from .main import durability_lock
 
 router = APIRouter()
 
@@ -35,8 +36,9 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
 def internal_counter_update(upd: CounterUpdate):
     changed = would_change_update(upd)
     if changed:
-        append_wal_update(upd)
-        apply_update(upd)
+        with durability_lock:
+            append_wal_update(upd)
+            apply_update(upd)
 
     return {"ok": True, "changed": changed, "node": NODE_ID}
 
@@ -53,8 +55,9 @@ def internal_cluster_merge(other: ClusterCRDTState):
     updates = extract_new_updates_from_cluster_state(other)
 
     for upd in updates:
-        append_wal_update(upd)
-        apply_update(upd)
+        with durability_lock:
+            append_wal_update(upd)
+            apply_update(upd)
 
     return {"ok": True, "applied_updates": len(updates), "node": NODE_ID}
 
@@ -71,8 +74,9 @@ def internal_merge(poll_id: str, other: PollCRDTState):
     updates = extract_new_updates_from_poll_state(poll_id, other)
 
     for upd in updates:
-        append_wal_update(upd)
-        apply_update(upd)
+        with durability_lock:
+            append_wal_update(upd)
+            apply_update(upd)
 
     return {"ok": True, "applied_updates": len(updates), "node": NODE_ID}
 
@@ -90,8 +94,9 @@ async def internal_sync(poll_id: str):
 
                 updates = extract_new_updates_from_poll_state(poll_id, other)
                 for upd in updates:
-                    append_wal_update(upd)
-                    apply_update(upd)
+                    with durability_lock:
+                        append_wal_update(upd)
+                        apply_update(upd)
 
                 return {
                     "ok": True,
@@ -119,8 +124,9 @@ async def anti_entropy_loop() -> None:
 
                 updates = extract_new_updates_from_cluster_state(other)
                 for upd in updates:
-                    append_wal_update(upd)
-                    apply_update(upd)
+                    with durability_lock:
+                        append_wal_update(upd)
+                        apply_update(upd)
 
             except Exception as e:
                 print(f"[anti-entropy] failed from {peer}: {e}")
