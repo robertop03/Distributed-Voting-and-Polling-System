@@ -45,3 +45,10 @@ volumes:
   node1_data:
   node2_data:
   node3_data:
+
+networks:
+  default:
+    name: progetto_ds_default
+  ds_isolated:
+    name: ds_isolated
+    internal: true
