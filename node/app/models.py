@@ -1,10 +1,17 @@
-from typing import Dict
-from pydantic import BaseModel, Field
+from typing import Dict, Annotated
+from pydantic import BaseModel, Field, StringConstraints
 
 
 class VoteIn(BaseModel):
-    poll_id: str = Field(..., examples=["poll1"])
-    option: str = Field(..., examples=["A"])
+    poll_id: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64)
+    ] = Field(..., examples=["poll1"])
+
+    option: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+    ] = Field(..., examples=["A"])
 
 
 class CounterUpdate(BaseModel):
