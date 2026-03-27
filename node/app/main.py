@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
-import threading
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
-
+from .locks import durability_lock
 from .config import NODE_ID, CHECKPOINT_INTERVAL
 from .models import VoteIn
 from .state import (
@@ -29,8 +28,6 @@ from .storage import (
     append_wal_update,
 )
 
-
-durability_lock = threading.RLock()
 
 async def checkpoint_loop():
     while True:

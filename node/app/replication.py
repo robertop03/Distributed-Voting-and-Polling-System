@@ -14,7 +14,7 @@ from .state import (
     extract_new_updates_from_cluster_state,
 )
 from .storage import append_wal_update
-from .main import durability_lock
+from .locks import durability_lock
 
 router = APIRouter()
 
