@@ -38,7 +38,12 @@ async function refreshPoll() {
   } else {
     for (const opt of keys) {
       const tr = document.createElement("tr")
-      tr.innerHTML = `<td>${opt}</td><td>${counts[opt]}</td>`
+      const tdOption = document.createElement("td")
+      tdOption.textContent = opt
+      const tdCount = document.createElement("td")
+      tdCount.textContent = String(counts[opt])
+      tr.appendChild(tdOption)
+      tr.appendChild(tdCount)
       tbody.appendChild(tr)
     }
   }
@@ -59,7 +64,13 @@ async function refreshStatus() {
     for (const p of peers) {
       const cls = badgeClass(p.state)
       const tr = document.createElement("tr")
-      tr.innerHTML = `<td>${p.peer}</td><td class="badge ${cls}">${p.state}</td>`
+      const tdPeer = document.createElement("td")
+      tdPeer.textContent = p.peer
+      const tdState = document.createElement("td")
+      tdState.className = `badge ${cls}`
+      tdState.textContent = p.state
+      tr.appendChild(tdPeer)
+      tr.appendChild(tdState)
       tbody.appendChild(tr)
     }
   }
