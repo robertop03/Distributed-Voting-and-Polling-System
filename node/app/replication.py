@@ -34,9 +34,9 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
 
 @router.post("/internal/counter/update")
 def internal_counter_update(upd: CounterUpdate):
-    changed = would_change_update(upd)
-    if changed:
-        with durability_lock:
+    with durability_lock:
+        changed = would_change_update(upd)
+        if changed:
             append_wal_update(upd)
             apply_update(upd)
 
@@ -52,10 +52,10 @@ def internal_cluster_state() -> ClusterCRDTState:
 
 @router.post("/internal/cluster-merge")
 def internal_cluster_merge(other: ClusterCRDTState):
-    updates = extract_new_updates_from_cluster_state(other)
+    with durability_lock:
+        updates = extract_new_updates_from_cluster_state(other)
 
-    for upd in updates:
-        with durability_lock:
+        for upd in updates:
             append_wal_update(upd)
             apply_update(upd)
 
@@ -71,10 +71,10 @@ def internal_state(poll_id: str) -> PollCRDTState:
 
 @router.post("/internal/merge/{poll_id}")
 def internal_merge(poll_id: str, other: PollCRDTState):
-    updates = extract_new_updates_from_poll_state(poll_id, other)
+    with durability_lock:
+        updates = extract_new_updates_from_poll_state(poll_id, other)
 
-    for upd in updates:
-        with durability_lock:
+        for upd in updates:
             append_wal_update(upd)
             apply_update(upd)
 
@@ -92,9 +92,9 @@ async def internal_sync(poll_id: str):
                 st = await client.get(f"{peer}/internal/state/{poll_id}")
                 other = PollCRDTState(**st.json())
 
-                updates = extract_new_updates_from_poll_state(poll_id, other)
-                for upd in updates:
-                    with durability_lock:
+                with durability_lock:
+                    updates = extract_new_updates_from_poll_state(poll_id, other)
+                    for upd in updates:
                         append_wal_update(upd)
                         apply_update(upd)
 
@@ -122,9 +122,9 @@ async def anti_entropy_loop() -> None:
                 resp.raise_for_status()
                 other = ClusterCRDTState(**resp.json())
 
-                updates = extract_new_updates_from_cluster_state(other)
-                for upd in updates:
-                    with durability_lock:
+                with durability_lock:
+                    updates = extract_new_updates_from_cluster_state(other)
+                    for upd in updates:
                         append_wal_update(upd)
                         apply_update(upd)
 
