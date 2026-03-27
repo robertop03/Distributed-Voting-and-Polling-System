@@ -12,6 +12,10 @@ function Get-Status($port) {
     Invoke-RestMethod "http://localhost:$port/status"
 }
 
+function Get-Status_With-URL($url) {
+    return Invoke-RestMethod -Uri "$url/status" -Method Get
+}
+
 function Wait-Seconds($s) {
     Start-Sleep -Seconds $s
 }
@@ -106,4 +110,35 @@ function Wait-UntilAllNodesPollCounts($ports, $poll, $expectedA, $expectedB, $ti
 
     $snapshotsJson = $lastSnapshots | ConvertTo-Json -Depth 10
     throw "Timeout waiting for all nodes to reach A=$expectedA, B=$expectedB for poll '$poll'. Last snapshots: $snapshotsJson"
+}
+
+function Get-PeerState($statusObj, $peerName) {
+    foreach ($p in $statusObj.peers) {
+        if ($p.peer -like "*$peerName*") {
+            return $p.state
+        }
+    }
+    return $null
+}
+
+function Wait-ForPeerState($observerUrl, $peerName, $expectedStates, $timeoutSec = 20, $intervalSec = 1) {
+    $deadline = (Get-Date).AddSeconds($timeoutSec)
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $status = Get-Status_With-URL $observerUrl
+            $state = Get-PeerState $status $peerName
+            Write-Host "[INFO] Observed state for $peerName from $observerUrl => $state"
+
+            if ($null -ne $state -and $expectedStates -contains $state) {
+                return $true
+            }
+        } catch {
+            Write-Host "[WARN] Failed to query $observerUrl/status : $_"
+        }
+
+        Start-Sleep -Seconds $intervalSec
+    }
+
+    return $false
 }

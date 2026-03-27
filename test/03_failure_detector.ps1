@@ -1,19 +1,40 @@
 . "$PSScriptRoot/common.ps1"
 
-Print-Step "Stop node2"
-docker compose stop node2
+$ErrorActionPreference = "Stop"
 
-Wait-Seconds 5
+Print-Step "Failure detector test"
 
-Print-Step "Check status from node1"
-Invoke-RestMethod http://localhost:8001/status
+Print-Step "Stopping node2..."
+docker compose stop node2 | Out-Null
 
-Print-Step "Restart node2"
-docker compose start node2
+Print-Step "Waiting for node1 to mark node2 as SUSPECT or DEAD..."
+$downDetected = Wait-ForPeerState `
+    -observerUrl "http://localhost:8001" `
+    -peerName "node2" `
+    -expectedStates @("SUSPECT", "DEAD") `
+    -timeoutSec 25 `
+    -intervalSec 1
 
-Wait-Seconds 5
+if (-not $downDetected) {
+    Write-Error "[FAIL] node1 did not mark node2 as SUSPECT/DEAD within timeout"
+    exit 1
+}
 
-Print-Step "Check recovery"
-Invoke-RestMethod http://localhost:8001/status
+Print-Step "Restarting node2..."
+docker compose start node2 | Out-Null
 
-Print-Ok "Failure detector tested"
+Print-Step "Waiting for node1 to mark node2 as ALIVE again..."
+$aliveDetected = Wait-ForPeerState `
+    -observerUrl "http://localhost:8001" `
+    -peerName "node2" `
+    -expectedStates @("ALIVE") `
+    -timeoutSec 30 `
+    -intervalSec 1
+
+if (-not $aliveDetected) {
+    Write-Error "[FAIL] node1 did not mark node2 as ALIVE again within timeout"
+    exit 1
+}
+
+Print-Ok "Failure detector correctly observed node2 down and up again."
+exit 0
