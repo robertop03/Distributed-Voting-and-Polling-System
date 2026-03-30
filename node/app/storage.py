@@ -1,10 +1,15 @@
 import json
+import logging
 import os
 import threading
-from typing import Dict, List
+from typing import List
+
+from pydantic import ValidationError
 
 from .config import DATA_DIR, CHECKPOINT_FILE, WAL_FILE
 from .models import CounterUpdate, ClusterCRDTState
+
+logger = logging.getLogger(__name__)
 
 _storage_lock = threading.RLock()
 
@@ -73,25 +78,60 @@ def write_checkpoint(state: ClusterCRDTState) -> None:
 def load_wal_updates() -> List[CounterUpdate]:
     ensure_storage()
     updates: List[CounterUpdate] = []
+    skipped = 0
 
     with _storage_lock:
         with open(WAL_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for line_no, raw_line in enumerate(f, start=1):
+                line = raw_line.strip()
                 if not line:
                     continue
 
-                rec = json.loads(line)
-                if rec.get("kind") == "counter_update":
-                    updates.append(
-                        CounterUpdate(
-                            poll_id=rec["poll_id"],
-                            option=rec["option"],
-                            node_id=rec["node_id"],
-                            value=rec["value"],
-                        )
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError as e:
+                    skipped += 1
+                    logger.warning(
+                        "Skipping corrupted WAL line %d: invalid JSON (%s)",
+                        line_no,
+                        e,
                     )
+                    continue
 
+                if rec.get("kind") != "counter_update":
+                    skipped += 1
+                    logger.warning(
+                        "Skipping WAL line %d: unsupported kind=%r",
+                        line_no,
+                        rec.get("kind"),
+                    )
+                    continue
+
+                try:
+                    upd = CounterUpdate.model_validate(
+                        {
+                            "poll_id": rec.get("poll_id"),
+                            "option": rec.get("option"),
+                            "node_id": rec.get("node_id"),
+                            "value": rec.get("value"),
+                        }
+                    )
+                except ValidationError as e:
+                    skipped += 1
+                    logger.warning(
+                        "Skipping invalid WAL line %d: %s",
+                        line_no,
+                        e.errors(),
+                    )
+                    continue
+
+                updates.append(upd)
+
+    logger.info(
+        "WAL recovery completed: recovered=%d skipped=%d",
+        len(updates),
+        skipped,
+    )
     return updates
 
 

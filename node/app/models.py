@@ -19,10 +19,22 @@ class CounterUpdate(BaseModel):
     Idempotent update: carries the new value of one component of the G-Counter.
     Receiver merges with max().
     """
-    poll_id: str
-    option: str
-    node_id: str
-    value: int
+    poll_id: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64)
+    ]
+
+    option: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+    ]
+
+    node_id: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64)
+    ]
+
+    value: int = Field(ge=0)
 
 
 class PollCRDTState(BaseModel):

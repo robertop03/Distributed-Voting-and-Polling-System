@@ -64,8 +64,9 @@ def apply_update(upd: CounterUpdate) -> bool:
 
 def export_poll_state(poll_id: str) -> PollCRDTState:
     with _state_lock:
+        poll_data = g_counter.get(poll_id, {})
         ensure_poll(poll_id)
-        counts = {opt: dict(nodes) for opt, nodes in g_counter[poll_id].items()}
+        counts = {opt: dict(nodes) for opt, nodes in poll_data.items()}
         return PollCRDTState(counts=counts)
 
 
@@ -80,11 +81,11 @@ def export_cluster_state() -> ClusterCRDTState:
 
 def query_poll_counts(poll_id: str) -> Dict[str, int]:
     with _state_lock:
-        ensure_poll(poll_id)
+        poll_data = g_counter.get(poll_id, {})
         result: Dict[str, int] = {}
-        for opt, nodes in g_counter[poll_id].items():
-            result[opt] = sum(nodes.values())
-        return result
+    for opt, nodes in poll_data.items():
+        result[opt] = sum(nodes.values())
+    return result
 
 
 def replace_cluster_state(other: ClusterCRDTState) -> None:

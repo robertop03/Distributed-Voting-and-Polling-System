@@ -2,7 +2,8 @@ import asyncio
 import random
 import httpx
 from fastapi import APIRouter, HTTPException
-
+import logging
+logger = logging.getLogger(__name__)
 from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
 from .state import (
@@ -24,12 +25,21 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
         return
 
     async with httpx.AsyncClient(timeout=1.5) as client:
-        tasks = []
-        for peer in PEERS:
-            tasks.append(
-                client.post(f"{peer}/internal/counter/update", json=upd.model_dump())
-            )
-        await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [
+            client.post(f"{peer}/internal/counter/update", json=upd.model_dump())
+            for peer in PEERS
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for peer, result in zip(PEERS, results):
+            if isinstance(result, Exception):
+                logger.warning("Replication to %s failed: %s", peer, result)
+                continue
+
+            try:
+                result.raise_for_status()
+            except Exception as e:
+                logger.warning("Replication to %s returned error: %s", peer, e)
 
 
 @router.post("/internal/counter/update")
@@ -129,6 +139,6 @@ async def anti_entropy_loop() -> None:
                         apply_update(upd)
 
             except Exception as e:
-                print(f"[anti-entropy] failed from {peer}: {e}")
+                logger.warning("Anti-entropy failed from %s: %s", peer, e)
 
             await asyncio.sleep(ANTI_ENTROPY_INTERVAL)

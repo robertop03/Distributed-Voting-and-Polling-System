@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
-
+import logging
+from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from .locks import durability_lock
 from .config import NODE_ID, CHECKPOINT_INTERVAL
 from .models import VoteIn
+
 from .state import (
     build_local_increment_update,
     apply_update,
@@ -28,6 +30,10 @@ from .storage import (
     append_wal_update,
 )
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parent
+UI_DIR = BASE_DIR / "ui"
 
 async def checkpoint_loop():
     while True:
@@ -52,11 +58,17 @@ async def lifespan(app: FastAPI):
     for upd in wal_updates:
         apply_update(upd)
 
-    asyncio.create_task(heartbeat_loop())
-    asyncio.create_task(anti_entropy_loop())
-    asyncio.create_task(checkpoint_loop())
-
-    yield
+    tasks = [
+        asyncio.create_task(heartbeat_loop(), name="heartbeat_loop"),
+        asyncio.create_task(anti_entropy_loop(), name="anti_entropy_loop"),
+        asyncio.create_task(checkpoint_loop(), name="checkpoint_loop"),
+    ]
+    try:
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 app = FastAPI(
@@ -67,7 +79,7 @@ app = FastAPI(
 app.include_router(replication_router)
 app.include_router(failure_router)
 
-app.mount("/ui", StaticFiles(directory="app/ui", html=True), name="ui")
+app.mount("/ui", StaticFiles(directory=str(UI_DIR), html=True), name="ui")
 
 
 @app.get("/")

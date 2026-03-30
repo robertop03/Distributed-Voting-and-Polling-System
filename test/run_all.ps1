@@ -1,13 +1,14 @@
-& "$PSScriptRoot\01_basic_replication.ps1"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$ErrorActionPreference = "Stop"
 
-& "$PSScriptRoot\02_eventual_consistency.ps1"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+try {
+    & "$PSScriptRoot\01_basic_replication.ps1"
+    & "$PSScriptRoot\02_eventual_consistency.ps1"
+    & "$PSScriptRoot\03_failure_detector.ps1"
+    & "$PSScriptRoot\04_crash_recovery.ps1"
 
-& "$PSScriptRoot\03_failure_detector.ps1"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-& "$PSScriptRoot\04_crash_recovery.ps1"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "`nAll tests completed." -ForegroundColor Green
+    Write-Host "`nAll tests completed." -ForegroundColor Green
+}
+catch {
+    Write-Host "`n[FAIL] $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
