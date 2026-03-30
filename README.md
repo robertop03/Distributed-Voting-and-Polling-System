@@ -8,7 +8,10 @@ Each node:
 
 - accepts votes independently through a REST API
 - maintains a local replica of the voting state
-- asynchronously propagates updates to other nodes
+- propagates updates to other nodes on a best-effort basis
+
+Updates are disseminated without coordination or quorum requirements.
+If some replicas miss an update due to failures or partitions, periodic anti-entropy synchronization guarantees eventual convergence.
 
 The system is designed to tolerate:
 
@@ -35,9 +38,9 @@ Each node includes:
 ### High-level workflow
 
 1. A client submits a vote to any node
-2. The node updates its local CRDT state
-3. The update is written to the WAL and applied in memory
-4. The update is asynchronously replicated to peers
+2. The node appends the update to the WAL and applies it to its local CRDT state
+3. The node attempts to propagate the update to its peers on a best-effort basis
+4. Missed updates may temporarily create replica divergence
 5. Nodes periodically reconcile state via anti-entropy
 
 ---
@@ -60,6 +63,9 @@ This is achieved through:
 - Deterministic convergence across all nodes
 - Monotonic growth of counters
 - No data loss after crash (with WAL + checkpoint fix)
+
+Write propagation is best-effort and does not require immediate acknowledgement from all peers.
+Therefore, replicas may temporarily diverge, but the combination of CRDT merge semantics and anti-entropy ensures Strong Eventual Consistency.
 
 ### Non-goals
 

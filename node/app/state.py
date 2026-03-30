@@ -82,10 +82,7 @@ def export_cluster_state() -> ClusterCRDTState:
 def query_poll_counts(poll_id: str) -> Dict[str, int]:
     with _state_lock:
         poll_data = g_counter.get(poll_id, {})
-        result: Dict[str, int] = {}
-    for opt, nodes in poll_data.items():
-        result[opt] = sum(nodes.values())
-    return result
+        return {opt: sum(nodes.values()) for opt, nodes in poll_data.items()}
 
 
 def replace_cluster_state(other: ClusterCRDTState) -> None:
