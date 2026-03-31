@@ -228,11 +228,14 @@ On restart:
 
 Nodes exchange periodic heartbeats.
 
-Each node tracks peer status:
+Each peer can be in one of the following states:
 
-- `ALIVE`
-- `SUSPECT`
-- `DEAD`
+- ALIVE: the peer is responding to heartbeats
+- SUSPECT: the peer missed some heartbeats and may be unreachable
+- DEAD: the peer is considered unreachable
+- UNKNOWN: the peer has not been observed yet or no recent information is available
+
+A peer typically transitions from UNKNOWN to ALIVE after the first successful heartbeat.
 
 This mechanism is **timeout-based** and may produce false positives under network delay.
 
