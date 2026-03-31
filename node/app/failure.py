@@ -3,6 +3,7 @@ import time
 import asyncio
 import httpx
 from fastapi import APIRouter
+from urllib.parse import urlparse
 from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT
 
 router = APIRouter()
@@ -13,21 +14,41 @@ peer_last_seen = {peer: 0.0 for peer in PEERS}
 
 def _normalize_sender(sender: str) -> str:
     """
-    Normalizza sender in modo che includa sempre la porta, es:
-    http://node2 -> http://node2:8002 (se è un peer noto)
-    Se non è riconoscibile, lo lasciamo com'è.
+    Normalize sender so that it matches one of the configured PEERS
+    using structured URL parsing instead of string heuristics.
+
+    Examples:
+    - http://node2:8002 -> http://node2:8002
+    - http://node2      -> http://node2:8002   (if uniquely identifiable in PEERS)
+    - node2:8002        -> http://node2:8002
     """
     sender = sender.strip()
-
-    # Se arriva già con porta, ok
-    if ":" in sender.replace("http://", "").replace("https://", ""):
+    if not sender:
         return sender
 
-    # Se manca porta, proviamo a matchare con uno dei PEERS
-    # es: sender="http://node2" e in PEERS c'è "http://node2:8002"
-    for p in PEERS:
-        if p.startswith(sender + ":"):
-            return p
+    parsed_sender = urlparse(sender if "://" in sender else f"http://{sender}")
+    sender_host = parsed_sender.hostname
+    sender_port = parsed_sender.port
+
+    if sender_host is None:
+        return sender
+
+    # Exact host:port match against configured peers
+    for peer in PEERS:
+        parsed_peer = urlparse(peer if "://" in peer else f"http://{peer}")
+        if parsed_peer.hostname == sender_host and parsed_peer.port == sender_port:
+            return peer
+
+    # Fallback: if sender has no port, try unique hostname match
+    if sender_port is None:
+        matches = []
+        for peer in PEERS:
+            parsed_peer = urlparse(peer if "://" in peer else f"http://{peer}")
+            if parsed_peer.hostname == sender_host:
+                matches.append(peer)
+
+        if len(matches) == 1:
+            return matches[0]
 
     return sender
 
@@ -35,8 +56,8 @@ def _normalize_sender(sender: str) -> str:
 @router.post("/internal/heartbeat")
 def internal_heartbeat(sender: str):
     """
-    Endpoint chiamato dai peer per segnalare che sono vivi.
-    Aggiorna last_seen SOLO per peer noti, così evitiamo duplicati.
+    Endpoint used by peers to signal they are alive.
+    Updates last_seen only for configured peers, avoiding duplicate identities.
     """
     now = time.monotonic()
     sender = _normalize_sender(sender)
