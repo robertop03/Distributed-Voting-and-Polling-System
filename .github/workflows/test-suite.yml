@@ -1,0 +1,58 @@
+name: Stress Test Distributed System
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  stress-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker
+        run: docker --version
+
+      - name: Setup PowerShell
+        uses: PowerShell/PowerShell@v1
+
+      - name: Run stress test (100 iterations)
+        shell: pwsh
+        run: |
+          $success = 0
+          $fail = 0
+
+          for ($i = 1; $i -le 50; $i++) {
+              Write-Host "`n=============================="
+              Write-Host "RUN #$i"
+              Write-Host "==============================" -ForegroundColor Cyan
+
+              try {
+                  pwsh ./test/run_all.ps1
+
+                  if ($LASTEXITCODE -eq 0) {
+                      Write-Host "[OK] Run $i succeeded" -ForegroundColor Green
+                      $success++
+                  } else {
+                      Write-Host "[FAIL] Run $i failed (non-zero exit code)" -ForegroundColor Red
+                      $fail++
+                  }
+              }
+              catch {
+                  Write-Host "[FAIL] Run $i crashed: $($_.Exception.Message)" -ForegroundColor Red
+                  $fail++
+              }
+          }
+
+          Write-Host "`n=============================="
+          Write-Host "SUMMARY"
+          Write-Host "=============================="
+          Write-Host "Success: $success"
+          Write-Host "Fail: $fail"
+
+          if ($fail -gt 0) {
+              exit 1
+          }

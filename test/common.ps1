@@ -142,3 +142,33 @@ function Wait-ForPeerState($observerUrl, $peerName, $expectedStates, $timeoutSec
 
     return $false
 }
+
+function Post-InternalUpdate($port, $updateObj) {
+    Invoke-RestMethod -Method POST "http://localhost:$port/internal/counter/update" `
+        -ContentType "application/json" `
+        -Body ($updateObj | ConvertTo-Json)
+}
+
+function Get-CountsAB($port, $poll) {
+    $r = Get-Poll $port $poll
+    return [PSCustomObject]@{
+        A = Get-CountValue $r.counts "A"
+        B = Get-CountValue $r.counts "B"
+        Raw = $r
+    }
+}
+
+function Wait-HttpReady($port, $timeoutSec = 30) {
+    $deadline = (Get-Date).AddSeconds($timeoutSec)
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            Invoke-RestMethod -Method GET "http://localhost:$port/status" -TimeoutSec 2 | Out-Null
+            return
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+
+    throw "Service on port $port did not become ready within $timeoutSec seconds"
+}

@@ -34,4 +34,6 @@ if ($r.counts.A -eq 2 -and $r.counts.B -eq 1) {
 }
 
 Print-Step "Restart cluster"
-docker compose start node1 node2
+docker compose start node1 node2 | Out-Null
+Wait-HttpReady 8001
+Wait-HttpReady 8002
