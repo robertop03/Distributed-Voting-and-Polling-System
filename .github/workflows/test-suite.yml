@@ -1,25 +1,17 @@
 name: Stress Test Distributed System
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
-  stress-test:
-    runs-on: ubuntu-latest
+  run-script:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Docker
-        run: docker --version
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell@v1
-
-      - name: Run stress test (100 iterations)
+      - name: Esegui script PowerShell
         shell: pwsh
         run: |
           $success = 0
