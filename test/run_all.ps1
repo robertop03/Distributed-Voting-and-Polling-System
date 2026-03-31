@@ -23,6 +23,7 @@ try {
     & "$PSScriptRoot\07_network_partition_healing.ps1"
 
     Write-Host "`nAll tests completed." -ForegroundColor Green
+    exit 0
 }
 catch {
     Write-Host "`n[FAIL] $($_.Exception.Message)" -ForegroundColor Red

@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $mainNet = "progetto_ds_default"
 $isolatedNet = "ds_isolated"
-$container = "ds_node3"
+$container = "progetto_ds-node3"
 
 Print-Step "Ensure isolated network exists"
 docker network inspect $isolatedNet *> $null
