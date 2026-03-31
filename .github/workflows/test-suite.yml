@@ -1,50 +1,50 @@
-name: Stress Test Distributed System
+name: Test distribuiti
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-script:
-    runs-on: windows-latest
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Esegui script PowerShell
-        shell: pwsh
+      - name: Avvia stack
+        run: docker compose up -d --build
+
+      - name: Attendi servizi
         run: |
-          $success = 0
-          $fail = 0
+          for port in 8001 8002 8003; do
+            echo "Attendo servizio su porta ${port}..."
+            ok=0
+            for i in {1..45}; do
+              if curl -fsS "http://127.0.0.1:${port}/status" >/dev/null; then
+                echo "Porta ${port} pronta"
+                ok=1
+                break
+              fi
+              sleep 2
+            done
 
-          for ($i = 1; $i -le 50; $i++) {
-              Write-Host "`n=============================="
-              Write-Host "RUN #$i"
-              Write-Host "==============================" -ForegroundColor Cyan
-
-              try {
-                  pwsh ./test/run_all.ps1
-
-                  if ($LASTEXITCODE -eq 0) {
-                      Write-Host "[OK] Run $i succeeded" -ForegroundColor Green
-                      $success++
-                  } else {
-                      Write-Host "[FAIL] Run $i failed (non-zero exit code)" -ForegroundColor Red
-                      $fail++
-                  }
-              }
-              catch {
-                  Write-Host "[FAIL] Run $i crashed: $($_.Exception.Message)" -ForegroundColor Red
-                  $fail++
-              }
-          }
-
-          Write-Host "`n=============================="
-          Write-Host "SUMMARY"
-          Write-Host "=============================="
-          Write-Host "Success: $success"
-          Write-Host "Fail: $fail"
-
-          if ($fail -gt 0) {
+            if [ "$ok" -ne 1 ]; then
+              echo "Servizio sulla porta ${port} non pronto in tempo"
+              docker compose ps
+              docker compose logs
               exit 1
-          }
+            fi
+          done
+
+      - name: Esegui run_all.ps1
+        shell: pwsh
+        run: ./test/run_all.ps1
+
+      - name: Log in caso di errore
+        if: failure()
+        run: docker compose logs
+
+      - name: Spegni stack
+        if: always()
+        run: docker compose down -v
