@@ -51,3 +51,5 @@ htmlcov/
 *.swp
 *.swo
 *~
+
+docker-compose.generated.yml

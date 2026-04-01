@@ -1,7 +1,5 @@
 # Distributed Voting System (CRDT-based)
 
-![CI](https://github.com/robertop03/Distributed-Voting-and-Polling-System/actions/workflows/test-suite.yml/badge.svg)
-
 ## Overview
 
 This project implements a **Distributed Voting and Polling System** composed of multiple nodes that collaboratively collect, replicate, and aggregate votes.
@@ -21,6 +19,103 @@ The system is designed to tolerate:
 - network partitions
 
 and ensures **Strong Eventual Consistency (SEC)** using a **CRDT-based approach**.
+
+---
+
+## Prerequisites
+
+Make sure the following tools are installed:
+
+- Git
+- Docker
+- Docker Compose
+- Python 3
+
+Verify installation:
+
+```bash
+git --version
+docker --version
+docker compose version
+python --version
+```
+
+On Windows, you may need to use:
+
+```bash
+py --version
+```
+
+---
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/robertop03/Distributed-Voting-and-Polling-System
+cd Distributed-Voting-and-Polling-System
+```
+
+---
+
+## Running the System
+
+### Start the cluster
+
+The system can be started with a configurable number of nodes.
+
+Example (3 nodes):
+
+```bash
+python run_cluster.py 3
+```
+
+You can choose any number of nodes:
+
+```bash
+python run_cluster.py 5
+```
+
+This will:
+
+- generate a Docker Compose configuration dynamically
+- start a cluster of N nodes
+- assign ports `8001 ... 800N`
+
+---
+
+### Submit a vote
+
+```bash
+curl -X POST http://localhost:8001/vote \
+  -H "Content-Type: application/json" \
+  -d '{"poll_id":"poll1","option":"A"}'
+```
+
+---
+
+### Get poll results
+
+```bash
+curl http://localhost:8001/poll/poll1
+```
+
+---
+
+### Node status
+
+```bash
+curl http://localhost:8001/status
+```
+
+---
+
+## Stop the Cluster
+
+To stop and remove all containers and volumes:
+
+```bash
+python stop_cluster.py
+```
 
 ---
 
@@ -49,11 +144,9 @@ Each node includes:
 
 ## Consistency Model
 
-The system provides:
-
 ### Strong Eventual Consistency (SEC)
 
-This is achieved through:
+Achieved through:
 
 - CRDT G-Counter (per poll/option/node)
 - Commutative, associative and idempotent merge
@@ -64,10 +157,10 @@ This is achieved through:
 - No conflicts under concurrent updates
 - Deterministic convergence across all nodes
 - Monotonic growth of counters
-- No data loss after crash (with WAL + checkpoint fix)
+- No data loss after crash (with WAL + checkpoint)
 
 Write propagation is best-effort and does not require immediate acknowledgement from all peers.
-Therefore, replicas may temporarily diverge, but the combination of CRDT merge semantics and anti-entropy ensures Strong Eventual Consistency.
+Replicas may temporarily diverge, but eventually converge.
 
 ### Non-goals
 
@@ -91,13 +184,11 @@ Each node only increments its own counter.
 
 ### Merge rule
 
-When merging replicas:
-
 ```
 value = max(local_value, remote_value)
 ```
 
-This ensures:
+Ensures:
 
 - idempotency
 - convergence without coordination
@@ -113,73 +204,23 @@ Each node uses:
 
 ### Crash safety
 
-A global durability lock ensures that:
+A global durability lock ensures:
 
-- `WAL append + state apply`
-- `checkpoint + WAL truncation`
+- WAL append + state apply
+- checkpoint + WAL truncation
 
 are serialized.
 
-This guarantees that every update is either:
+Every update is either:
 
-- included in the checkpoint, or
-- preserved in the WAL
+- in the checkpoint, or
+- in the WAL
 
-→ preventing data loss on restart.
-
----
-
-## Technologies
-
-- Python
-- FastAPI
-- Asyncio
-- Docker & Docker Compose
-- JSON (data exchange)
-
----
-
-## Running the system
-
-### 1. Start the cluster
-
-```bash
-docker compose up --build
-```
-
-The system will start multiple nodes (e.g. node1, node2, node3).
-
----
-
-### 2. Submit a vote
-
-```bash
-curl -X POST http://localhost:8001/vote \
-  -H "Content-Type: application/json" \
-  -d '{"poll_id":"poll1","option":"A"}'
-```
-
----
-
-### 3. Get poll results
-
-```bash
-curl http://localhost:8001/poll/poll1
-```
-
----
-
-### 4. Node status
-
-```bash
-curl http://localhost:8001/status
-```
+→ preventing data loss.
 
 ---
 
 ## Network Partition Simulation
-
-The system supports simulation of network partitions using Docker networks.
 
 ### Networks
 
@@ -194,10 +235,6 @@ docker network disconnect progetto_ds_default $NODE3
 docker network connect ds_isolated $NODE3
 ```
 
-Now `node3` is running but cannot communicate with other nodes.
-
----
-
 ### Reconnect the node
 
 ```bash
@@ -205,15 +242,13 @@ docker network disconnect ds_isolated $NODE3
 docker network connect progetto_ds_default $NODE3
 ```
 
-After reconnection, anti-entropy will synchronize the state.
+After reconnection, anti-entropy synchronizes the state.
 
 ---
 
 ## Failure Handling
 
 ### Node crash
-
-Simulate:
 
 ```bash
 docker compose stop node2
@@ -231,16 +266,14 @@ On restart:
 
 Nodes exchange periodic heartbeats.
 
-Each peer can be in one of the following states:
+Peer states:
 
-- ALIVE: the peer is responding to heartbeats
-- SUSPECT: the peer missed some heartbeats and may be unreachable
-- DEAD: the peer is considered unreachable
-- UNKNOWN: the peer has not been observed yet or no recent information is available
+- ALIVE
+- SUSPECT
+- DEAD
+- UNKNOWN
 
-A peer typically transitions from UNKNOWN to ALIVE after the first successful heartbeat.
-
-This mechanism is **timeout-based** and may produce false positives under network delay.
+Transitions are timeout-based and may produce false positives.
 
 ---
 
@@ -250,27 +283,30 @@ Nodes periodically:
 
 1. select a random peer
 2. fetch its full state
-3. merge missing updates
+3. merge updates
 
-This ensures convergence after:
+Ensures convergence after:
 
-- network partitions
-- temporary inconsistencies
-- node recovery
+- partitions
+- failures
+- recovery
 
 ---
 
 ## Limitations
 
-- Votes are modeled as **increments only**
+- Votes are **increments only**
+
 - No support for:
   - vote changes
   - vote removal
   - "one user = one vote"
 
-- `/vote` is not idempotent (duplicate requests may increase counts)
-- Anti-entropy is simple and not bandwidth-optimized
-- Failure detector is basic (timeout-based)
+- `/vote` is not idempotent
+
+- Anti-entropy is not bandwidth optimized
+
+- Failure detector is basic
 
 ---
 
@@ -281,5 +317,3 @@ Basic scenarios included:
 - Vote propagation across nodes
 - Node failure and recovery
 - Network partition and reconciliation
-
----
