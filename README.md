@@ -1,5 +1,7 @@
 # Distributed Voting System (CRDT-based)
 
+![CI](https://github.com/robertop03/Distributed-Voting-and-Polling-System/actions/workflows/test-suite.yml/badge.svg)
+
 ## Overview
 
 This project implements a **Distributed Voting and Polling System** composed of multiple nodes that collaboratively collect, replicate, and aggregate votes.
