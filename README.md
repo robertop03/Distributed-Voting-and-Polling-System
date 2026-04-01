@@ -189,8 +189,9 @@ The system supports simulation of network partitions using Docker networks.
 ### Isolate a node
 
 ```bash
-docker network disconnect progetto_ds_default ds_node3
-docker network connect ds_isolated ds_node3
+NODE3=$(docker compose ps -q node3)
+docker network disconnect progetto_ds_default $NODE3
+docker network connect ds_isolated $NODE3
 ```
 
 Now `node3` is running but cannot communicate with other nodes.
@@ -200,8 +201,8 @@ Now `node3` is running but cannot communicate with other nodes.
 ### Reconnect the node
 
 ```bash
-docker network disconnect ds_isolated ds_node3
-docker network connect progetto_ds_default ds_node3
+docker network disconnect ds_isolated $NODE3
+docker network connect progetto_ds_default $NODE3
 ```
 
 After reconnection, anti-entropy will synchronize the state.
