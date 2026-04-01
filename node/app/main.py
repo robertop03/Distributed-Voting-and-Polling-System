@@ -14,6 +14,7 @@ from .state import (
     apply_update,
     query_poll_counts,
     replace_cluster_state,
+    list_polls
 )
 from .replication import (
     router as replication_router,
@@ -85,6 +86,12 @@ app.mount("/ui", StaticFiles(directory=str(UI_DIR), html=True), name="ui")
 @app.get("/")
 def root():
     return RedirectResponse(url="/ui/")
+
+
+@app.get("/polls")
+def get_polls():
+    poll_ids = sorted(list_polls())
+    return {"poll_ids": poll_ids, "node": NODE_ID}
 
 
 @app.post("/vote")

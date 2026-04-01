@@ -182,3 +182,34 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+.poll-list-wrap {
+  margin-top: 16px;
+}
+
+.poll-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.poll-list-item {
+  background: #0f1320;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.poll-list-item:hover {
+  border-color: var(--accent);
+}
+
+.poll-list-item.active {
+  background: var(--accent);
+  color: #0b0e14;
+  border-color: var(--accent);
+}
