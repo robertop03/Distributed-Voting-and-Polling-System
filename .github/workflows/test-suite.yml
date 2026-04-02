@@ -20,6 +20,12 @@ jobs:
           python3 --version
           pwsh --version
 
+      - name: Crea file .env
+        run: |
+          cat > .env <<EOF
+          INTERNAL_API_KEY=my-token
+          EOF
+
       - name: Esegui stress test
         shell: pwsh
         run: |
@@ -38,25 +44,20 @@ jobs:
               $logFile = "stress-logs/run-$i.log"
 
               try {
-                  # cleanup iniziale
                   if (Test-Path "docker-compose.generated.yml") {
                       docker compose -f docker-compose.generated.yml down -v --remove-orphans *>> $logFile
                   }
 
-                  # genera il compose file
                   python3 -c "from run_cluster import generate_compose; generate_compose(3)" *>&1 | Tee-Object -FilePath $logFile -Append
 
                   if (-not (Test-Path "docker-compose.generated.yml")) {
                       throw "docker-compose.generated.yml was not generated"
                   }
 
-                  # avvia cluster in background
                   docker compose -f docker-compose.generated.yml up -d --build *>&1 | Tee-Object -FilePath $logFile -Append
 
-                  # piccola attesa iniziale
                   Start-Sleep -Seconds 5
 
-                  # esegui i test
                   ./test/run_all.ps1 *>&1 | Tee-Object -FilePath $logFile -Append
 
                   if ($LASTEXITCODE -eq 0) {
