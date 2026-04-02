@@ -15,10 +15,10 @@ $r = Get-Poll 8003 $poll
 $r
 
 Print-Step "Stop node1 and node2"
-docker compose stop node1 node2
+docker compose -f docker-compose.generated.yml stop node1 node2
 
 Print-Step "Restart node3"
-docker compose restart node3
+docker compose -f docker-compose.generated.yml restart node3
 
 Wait-Seconds 4
 
@@ -34,6 +34,6 @@ if ($r.counts.A -eq 2 -and $r.counts.B -eq 1) {
 }
 
 Print-Step "Restart cluster"
-docker compose start node1 node2 | Out-Null
+docker compose -f docker-compose.generated.yml start node1 node2 | Out-Null
 Wait-HttpReady 8001
 Wait-HttpReady 8002

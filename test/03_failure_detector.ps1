@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 Print-Step "Failure detector test"
 
 Print-Step "Stopping node2..."
-docker compose stop node2 | Out-Null
+docker compose -f docker-compose.generated.yml stop node2 | Out-Null
 
 Print-Step "Waiting for node1 to mark node2 as SUSPECT or DEAD..."
 $downDetected = Wait-ForPeerState `
@@ -21,7 +21,7 @@ if (-not $downDetected) {
 }
 
 Print-Step "Restarting node2..."
-docker compose start node2 | Out-Null
+docker compose -f docker-compose.generated.yml start node2 | Out-Null
 
 Print-Step "Waiting for node1 to mark node2 as ALIVE again..."
 $aliveDetected = Wait-ForPeerState `

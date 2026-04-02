@@ -2,6 +2,13 @@
 
 $poll = "test_idempotent"
 $ErrorActionPreference = "Stop"
+$headers = @{}
+
+if ($env:INTERNAL_TOKEN) {
+    Print-Step "Ciao"
+    $headers["X-Internal-Token"] = $env:INTERNAL_TOKEN
+    Print-Step $headers["X-Internal-Token"]
+}
 
 Print-Step "Create one vote on node1"
 $voteResp = Vote 8001 $poll "A"
@@ -10,10 +17,12 @@ $upd = $voteResp.update
 Print-Step "Replay the same internal update twice on node2"
 Invoke-RestMethod -Method POST "http://localhost:8002/internal/counter/update" `
     -ContentType "application/json" `
+    -Headers $headers `
     -Body ($upd | ConvertTo-Json)
 
 Invoke-RestMethod -Method POST "http://localhost:8002/internal/counter/update" `
     -ContentType "application/json" `
+    -Headers $headers `
     -Body ($upd | ConvertTo-Json)
 
 Print-Step "Wait for all nodes to converge to A=1, B=0"

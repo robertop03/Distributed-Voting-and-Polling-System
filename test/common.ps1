@@ -172,3 +172,28 @@ function Wait-HttpReady($port, $timeoutSec = 30) {
 
     throw "Service on port $port did not become ready within $timeoutSec seconds"
 }
+
+function Import-Env {
+    param(
+        [string]$Path = ".env"
+    )
+
+    if (-not (Test-Path $Path)) {
+        Write-Warning ".env file not found at $Path"
+        return
+    }
+
+    Get-Content $Path | ForEach-Object {
+        $line = $_.Trim()
+
+        if (-not $line) { return }
+        if ($line.StartsWith("#")) { return }
+        if ($line -notmatch "=") { return }
+
+        $key, $value = $line -split "=", 2
+        $key = $key.Trim()
+        $value = $value.Trim()
+
+        [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
+    }
+}

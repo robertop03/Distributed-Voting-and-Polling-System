@@ -1,10 +1,10 @@
 import asyncio
 import random
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import logging
 logger = logging.getLogger(__name__)
-from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL
+from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL, INTERNAL_TOKEN
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
 from .state import (
     would_change_update,
@@ -16,17 +16,23 @@ from .state import (
 )
 from .storage import append_wal_update
 from .locks import durability_lock
+from .security import verify_internal_token
 
 router = APIRouter()
 
+def internal_auth_headers() -> dict[str, str]:
+    if not INTERNAL_TOKEN:
+        return {}
+    return {"X-Internal-Token": INTERNAL_TOKEN}
 
 async def replicate_update_to_peers(upd: CounterUpdate) -> None:
     if not PEERS:
         return
 
     async with httpx.AsyncClient(timeout=1.5) as client:
+        headers = internal_auth_headers()
         tasks = [
-            client.post(f"{peer}/internal/counter/update", json=upd.model_dump())
+            client.post(f"{peer}/internal/counter/update", json=upd.model_dump(), headers=headers)
             for peer in PEERS
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -43,7 +49,7 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
 
 
 @router.post("/internal/counter/update")
-def internal_counter_update(upd: CounterUpdate):
+def internal_counter_update(upd: CounterUpdate, _: None = Depends(verify_internal_token)):
     with durability_lock:
         changed = would_change_update(upd)
         if changed:
@@ -56,12 +62,12 @@ def internal_counter_update(upd: CounterUpdate):
 # ---- cluster-wide endpoints: use unambiguous names ----
 
 @router.get("/internal/cluster-state")
-def internal_cluster_state() -> ClusterCRDTState:
+def internal_cluster_state(_: None = Depends(verify_internal_token)) -> ClusterCRDTState:
     return export_cluster_state()
 
 
 @router.post("/internal/cluster-merge")
-def internal_cluster_merge(other: ClusterCRDTState):
+def internal_cluster_merge(other: ClusterCRDTState, _: None = Depends(verify_internal_token)):
     with durability_lock:
         updates = extract_new_updates_from_cluster_state(other)
 
@@ -75,12 +81,12 @@ def internal_cluster_merge(other: ClusterCRDTState):
 # ---- poll-specific endpoints ----
 
 @router.get("/internal/state/{poll_id}")
-def internal_state(poll_id: str) -> PollCRDTState:
+def internal_state(poll_id: str, _: None = Depends(verify_internal_token)) -> PollCRDTState:
     return export_poll_state(poll_id)
 
 
 @router.post("/internal/merge/{poll_id}")
-def internal_merge(poll_id: str, other: PollCRDTState):
+def internal_merge(poll_id: str, other: PollCRDTState, _: None = Depends(verify_internal_token)):
     with durability_lock:
         updates = extract_new_updates_from_poll_state(poll_id, other)
 
@@ -92,14 +98,14 @@ def internal_merge(poll_id: str, other: PollCRDTState):
 
 
 @router.post("/internal/sync/{poll_id}")
-async def internal_sync(poll_id: str):
+async def internal_sync(poll_id: str, _: None = Depends(verify_internal_token)):
     if not PEERS:
         raise HTTPException(status_code=503, detail="No peers configured")
 
     async with httpx.AsyncClient(timeout=2.0) as client:
         for peer in PEERS:
             try:
-                st = await client.get(f"{peer}/internal/state/{poll_id}")
+                st = await client.get(f"{peer}/internal/state/{poll_id}",  headers=internal_auth_headers())
                 other = PollCRDTState(**st.json())
 
                 with durability_lock:
@@ -128,7 +134,7 @@ async def anti_entropy_loop() -> None:
         while True:
             peer = random.choice(PEERS)
             try:
-                resp = await client.get(f"{peer}/internal/cluster-state")
+                resp = await client.get(f"{peer}/internal/cluster-state", headers=internal_auth_headers())
                 resp.raise_for_status()
                 other = ClusterCRDTState(**resp.json())
 
@@ -139,6 +145,6 @@ async def anti_entropy_loop() -> None:
                         apply_update(upd)
 
             except Exception as e:
-                logger.warning("Anti-entropy failed from %s: %s", peer, e)
+                logger.warning("Anti-entropy failed from %s: %r", peer, e)
 
             await asyncio.sleep(ANTI_ENTROPY_INTERVAL)

@@ -1,11 +1,11 @@
 . "$PSScriptRoot/common.ps1"
 $ErrorActionPreference = "Stop"
-docker compose down -v
-docker compose up -d --build
 
 Wait-HttpReady 8001
 Wait-HttpReady 8002
 Wait-HttpReady 8003
+
+Import-Env
 
 Write-Host "Ensure isolated network exists"
 docker network inspect ds_isolated *> $null

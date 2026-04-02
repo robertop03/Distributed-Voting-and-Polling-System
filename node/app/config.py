@@ -14,3 +14,5 @@ DATA_DIR = os.getenv("DATA_DIR", "/data")
 CHECKPOINT_FILE = os.path.join(DATA_DIR, "checkpoint.json")
 WAL_FILE = os.path.join(DATA_DIR, "wal.jsonl")
 CHECKPOINT_INTERVAL = float(os.getenv("CHECKPOINT_INTERVAL", "10.0"))
+
+INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")

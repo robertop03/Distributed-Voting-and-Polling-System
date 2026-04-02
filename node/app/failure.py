@@ -2,14 +2,20 @@
 import time
 import asyncio
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from urllib.parse import urlparse
-from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT
+from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT, INTERNAL_TOKEN
+from .security import verify_internal_token
 
 router = APIRouter()
 
 # Manteniamo lo stato solo per i peer "ufficiali" (quelli in PEERS)
 peer_last_seen = {peer: 0.0 for peer in PEERS}
+
+def internal_auth_headers() -> dict[str, str]:
+    if not INTERNAL_TOKEN:
+        return {}
+    return {"X-Internal-Token": INTERNAL_TOKEN}
 
 
 def _normalize_sender(sender: str) -> str:
@@ -54,7 +60,7 @@ def _normalize_sender(sender: str) -> str:
 
 
 @router.post("/internal/heartbeat")
-def internal_heartbeat(sender: str):
+def internal_heartbeat(sender: str, _: None = Depends(verify_internal_token)):
     """
     Endpoint used by peers to signal they are alive.
     Updates last_seen only for configured peers, avoiding duplicate identities.
@@ -84,6 +90,7 @@ async def heartbeat_loop():
                     await client.post(
                         f"{peer}/internal/heartbeat",
                         params={"sender": my_sender},
+                        headers=internal_auth_headers()
                     )
                 except Exception:
                     # peer down/unreachable: ignora, verrà segnato SUSPECT/DEAD dai timeout

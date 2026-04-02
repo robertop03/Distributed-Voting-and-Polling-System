@@ -17,6 +17,8 @@ def build_service(node_index: int, total_nodes: int) -> str:
 
     return f"""  {node_name}:
     build: ./node
+    env_file:
+      - .env
     environment:
       - NODE_ID={node_name}
       - PORT={port}

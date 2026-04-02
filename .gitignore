@@ -53,3 +53,5 @@ htmlcov/
 *~
 
 docker-compose.generated.yml
+
+.env
