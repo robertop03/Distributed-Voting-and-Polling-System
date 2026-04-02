@@ -23,7 +23,7 @@ jobs:
       - name: Crea file .env
         run: |
           cat > .env <<EOF
-          INTERNAL_API_KEY=my-token
+          INTERNAL_TOKEN=my-token
           EOF
 
       - name: Esegui stress test
