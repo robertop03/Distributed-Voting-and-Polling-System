@@ -17,16 +17,10 @@ jobs:
           uname -a
           docker --version
           docker compose version
+          python3 --version
           pwsh --version
 
-      - name: Pre-clean Docker environment
-        run: |
-          docker compose -f docker-compose.generated.yml down -v --remove-orphans 2>/dev/null || true
-          docker compose down -v --remove-orphans 2>/dev/null || true
-          docker rm -f $(docker ps -aq) 2>/dev/null || true
-          docker network prune -f || true
-
-      - name: Esegui stress test PowerShell
+      - name: Esegui stress test
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
@@ -41,47 +35,56 @@ jobs:
               Write-Host "RUN #$i" -ForegroundColor Cyan
               Write-Host "==============================" -ForegroundColor Cyan
 
-              # cleanup prima di ogni run
-              docker compose -f docker-compose.generated.yml down -v --remove-orphans 2>$null
-              docker compose down -v --remove-orphans 2>$null
-              docker network prune -f | Out-Null
-
               $logFile = "stress-logs/run-$i.log"
 
               try {
-                  ./test/run_all.ps1 *>&1 | Tee-Object -FilePath $logFile
+                  # cleanup iniziale
+                  if (Test-Path "docker-compose.generated.yml") {
+                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>> $logFile
+                  }
+
+                  # genera il compose file
+                  python3 -c "from run_cluster import generate_compose; generate_compose(3)" *>&1 | Tee-Object -FilePath $logFile -Append
+
+                  if (-not (Test-Path "docker-compose.generated.yml")) {
+                      throw "docker-compose.generated.yml was not generated"
+                  }
+
+                  # avvia cluster in background
+                  docker compose -f docker-compose.generated.yml up -d --build *>&1 | Tee-Object -FilePath $logFile -Append
+
+                  # piccola attesa iniziale
+                  Start-Sleep -Seconds 5
+
+                  # esegui i test
+                  ./test/run_all.ps1 *>&1 | Tee-Object -FilePath $logFile -Append
 
                   if ($LASTEXITCODE -eq 0) {
                       Write-Host "[OK] Run $i succeeded" -ForegroundColor Green
                       $success++
                   }
                   else {
-                      Write-Host "[FAIL] Run $i failed (non-zero exit code: $LASTEXITCODE)" -ForegroundColor Red
+                      Write-Host "[FAIL] Run $i failed (exit code $LASTEXITCODE)" -ForegroundColor Red
                       $fail++
-
-                      Write-Host "---- docker compose ps ----" | Tee-Object -FilePath $logFile -Append
-                      docker compose -f docker-compose.generated.yml ps *>&1 | Tee-Object -FilePath $logFile -Append
-
-                      Write-Host "---- docker compose logs ----" | Tee-Object -FilePath $logFile -Append
-                      docker compose -f docker-compose.generated.yml logs --no-color *>&1 | Tee-Object -FilePath $logFile -Append
                   }
               }
               catch {
                   Write-Host "[FAIL] Run $i crashed: $($_.Exception.Message)" -ForegroundColor Red
                   $fail++
-
                   "Crash: $($_.Exception.Message)" | Tee-Object -FilePath $logFile -Append
-
-                  Write-Host "---- docker compose ps ----" | Tee-Object -FilePath $logFile -Append
-                  docker compose -f docker-compose.generated.yml ps *>&1 | Tee-Object -FilePath $logFile -Append
-
-                  Write-Host "---- docker compose logs ----" | Tee-Object -FilePath $logFile -Append
-                  docker compose -f docker-compose.generated.yml logs --no-color *>&1 | Tee-Object -FilePath $logFile -Append
               }
               finally {
-                  # cleanup dopo ogni run
-                  docker compose -f docker-compose.generated.yml down -v --remove-orphans 2>$null
-                  docker compose down -v --remove-orphans 2>$null
+                  if (Test-Path "docker-compose.generated.yml") {
+                      Write-Host "---- docker compose ps ----" | Tee-Object -FilePath $logFile -Append
+                      docker compose -f docker-compose.generated.yml ps *>&1 | Tee-Object -FilePath $logFile -Append
+
+                      Write-Host "---- docker compose logs ----" | Tee-Object -FilePath $logFile -Append
+                      docker compose -f docker-compose.generated.yml logs --no-color *>&1 | Tee-Object -FilePath $logFile -Append
+
+                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>&1 | Tee-Object -FilePath $logFile -Append
+                  }
+
+                  Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
                   docker network prune -f | Out-Null
                   Start-Sleep -Seconds 2
               }
@@ -104,10 +107,3 @@ jobs:
         with:
           name: stress-test-logs
           path: stress-logs/
-
-      - name: Final Docker cleanup
-        if: always()
-        run: |
-          docker compose -f docker-compose.generated.yml down -v --remove-orphans 2>/dev/null || true
-          docker compose down -v --remove-orphans 2>/dev/null || true
-          docker network prune -f || true
