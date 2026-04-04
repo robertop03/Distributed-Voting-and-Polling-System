@@ -23,7 +23,7 @@ def build_service(node_index: int, total_nodes: int) -> str:
       - NODE_ID={node_name}
       - PORT={port}
       - PEERS={peers_str}
-      - ANTI_ENTROPY_INTERVAL=3
+      - ANTI_ENTROPY_INTERVAL=10
       - CHECKPOINT_INTERVAL=10
       - DATA_DIR=/data
     ports:

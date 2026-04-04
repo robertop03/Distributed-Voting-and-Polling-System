@@ -83,7 +83,7 @@ async def heartbeat_loop():
 
     my_sender = f"http://{NODE_ID}:{PORT}"
 
-    async with httpx.AsyncClient(timeout=1.0) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=1.0)) as client:
         while True:
             for peer in PEERS:
                 try:
@@ -128,3 +128,23 @@ def status():
         )
 
     return result
+
+def get_peer_states() -> dict[str, str]:
+    now = time.monotonic()
+    states: dict[str, str] = {}
+
+    for peer, last in peer_last_seen.items():
+        age = None if last == 0.0 else (now - last)
+
+        if last == 0.0:
+            state = "UNKNOWN"
+        elif age <= SUSPECT_TIMEOUT:
+            state = "ALIVE"
+        elif age <= DEAD_TIMEOUT:
+            state = "SUSPECT"
+        else:
+            state = "DEAD"
+
+        states[peer] = state
+
+    return states

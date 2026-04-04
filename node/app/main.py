@@ -20,6 +20,7 @@ from .replication import (
     router as replication_router,
     replicate_update_to_peers,
     anti_entropy_loop,
+    close_replication_clients,
 )
 from .failure import router as failure_router, heartbeat_loop
 from .storage import (
@@ -70,6 +71,7 @@ async def lifespan(app: FastAPI):
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        await close_replication_clients()
 
 
 app = FastAPI(

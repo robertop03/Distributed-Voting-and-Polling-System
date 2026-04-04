@@ -5,9 +5,7 @@ $ErrorActionPreference = "Stop"
 $headers = @{}
 
 if ($env:INTERNAL_TOKEN) {
-    Print-Step "Ciao"
     $headers["X-Internal-Token"] = $env:INTERNAL_TOKEN
-    Print-Step $headers["X-Internal-Token"]
 }
 
 Print-Step "Create one vote on node1"
