@@ -37,7 +37,7 @@ def get_replication_client() -> httpx.AsyncClient:
     global _replication_client
     if _replication_client is None:
         _replication_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(8.0, connect=2.0),
+            timeout=httpx.Timeout(1.5, connect=0.5),
         )
     return _replication_client
 
@@ -46,7 +46,7 @@ def get_anti_entropy_client() -> httpx.AsyncClient:
     global _anti_entropy_client
     if _anti_entropy_client is None:
         _anti_entropy_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(8.0, connect=2.0),
+            timeout=httpx.Timeout(2.0, connect=0.5),
         )
     return _anti_entropy_client
 
@@ -70,7 +70,7 @@ def replication_targets() -> list[str]:
 
 def anti_entropy_targets() -> list[str]:
     states = get_peer_states()
-    return [peer for peer in PEERS if states.get(peer) in ("ALIVE", "SUSPECT")]
+    return [peer for peer in PEERS if states.get(peer) != "DEAD"]
 
 
 async def _replicate_update_to_peer(

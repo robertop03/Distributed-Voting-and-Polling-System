@@ -9,7 +9,7 @@ def main():
         print(f"{OUT_FILE} not found. Nothing to stop.")
         return
 
-    cmd = ["docker", "compose", "-f", str(OUT_FILE), "down", "-v"]
+    cmd = ["docker", "compose", "-f", str(OUT_FILE), "down", "-v", "--remove-orphans"]
     subprocess.run(cmd, check=True)
 
 

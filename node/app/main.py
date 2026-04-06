@@ -103,7 +103,7 @@ async def vote(v: VoteIn):
         append_wal_update(upd)
         apply_update(upd)
 
-    await replicate_update_to_peers(upd)
+    asyncio.create_task(replicate_update_to_peers(upd))
     return {"ok": True, "node": NODE_ID, "update": upd.model_dump()}
 
 

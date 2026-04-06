@@ -1,6 +1,41 @@
 . "$PSScriptRoot/common.ps1"
 $ErrorActionPreference = "Stop"
 
+function Ensure-ClusterRunning {
+    param([int]$Nodes = 3)
+
+    $projectRoot = Split-Path $PSScriptRoot -Parent
+    $composeFile = Join-Path $projectRoot "docker-compose.generated.yml"
+
+    if (-not (Test-Path $composeFile)) {
+        Push-Location $projectRoot
+        try {
+            python .\run_cluster.py $Nodes
+        } finally {
+            Pop-Location
+        }
+        return
+    }
+
+    $runningNodes = @()
+    try {
+        $runningNodes = @(docker compose -f $composeFile ps --services --status running)
+    } catch {
+        $runningNodes = @()
+    }
+
+    if ($runningNodes.Count -lt $Nodes) {
+        Push-Location $projectRoot
+        try {
+            docker compose -f $composeFile up -d --build | Out-Null
+        } finally {
+            Pop-Location
+        }
+    }
+}
+
+Ensure-ClusterRunning 3
+
 Wait-HttpReady 8001
 Wait-HttpReady 8002
 Wait-HttpReady 8003
