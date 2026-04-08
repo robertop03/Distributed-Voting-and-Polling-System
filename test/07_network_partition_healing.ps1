@@ -63,7 +63,7 @@ Wait-UntilAllNodesPollCounts @(8001, 8002, 8003) $pollId 1 0 20 | Out-Null
 
 # Isola node3 dalla rete principale
 docker network disconnect $mainNet $container | Out-Null
-docker network connect $isolatedNet $container | Out-Null
+docker network connect --alias node3 $isolatedNet $container | Out-Null
 
 Print-Step "node3 isolated from main cluster"
 
@@ -101,7 +101,7 @@ if ($c1_before -eq $c3_before) {
 
 # Heal partition
 docker network disconnect $isolatedNet $container | Out-Null
-docker network connect $mainNet $container | Out-Null
+docker network connect --alias node3 $mainNet $container | Out-Null
 
 Print-Step "node3 reconnected to main cluster"
 

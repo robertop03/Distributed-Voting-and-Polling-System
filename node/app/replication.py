@@ -105,9 +105,8 @@ async def replicate_update_to_peers(upd: CounterUpdate) -> None:
     payload = upd.model_dump()
 
     logger.info(
-        "Replicating update from %s headers=%s payload=%s targets=%s",
+        "Replicating update from %s payload=%s targets=%s",
         NODE_ID,
-        headers,
         payload,
         targets,
     )
