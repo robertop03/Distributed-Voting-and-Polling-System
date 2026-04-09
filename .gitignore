@@ -43,15 +43,9 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 
-# Environment variables
-.env
-.env.*
-
 # Temporary files
 *.swp
 *.swo
 *~
 
 docker-compose.generated.yml
-
-.env

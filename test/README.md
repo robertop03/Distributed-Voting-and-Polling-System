@@ -17,6 +17,9 @@ The test suite validates the following system properties:
 - failure detection (heartbeat mechanism)
 - crash recovery using WAL and checkpointing
 - persistence across node restarts
+- idempotent handling of duplicated internal updates
+- convergence under concurrent writes
+- divergence and healing after temporary disconnection
 
 ---
 
@@ -63,17 +66,6 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ```powershell
 .\test\run_all.ps1
-```
-
----
-
-### Run individual tests
-
-```powershell
-.\test\01_basic_replication.ps1
-.\test\02_eventual_consistency.ps1
-.\test\03_failure_detector.ps1
-.\test\04_crash_recovery.ps1
 ```
 
 ---

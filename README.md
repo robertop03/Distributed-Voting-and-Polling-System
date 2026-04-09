@@ -312,8 +312,5 @@ Ensures convergence after:
 
 ## Testing
 
-Basic scenarios included:
-
-- Vote propagation across nodes
-- Node failure and recovery
-- Network partition and reconciliation
+The automated validation suite is documented separately in:
+test/README.md
