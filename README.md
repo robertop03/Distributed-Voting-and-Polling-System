@@ -86,9 +86,7 @@ This will:
 ### Submit a vote
 
 ```bash
-curl -X POST http://localhost:8001/vote \
-  -H "Content-Type: application/json" \
-  -d '{"poll_id":"poll1","option":"A"}'
+Invoke-RestMethod -Uri "http://localhost:8001/vote" -Method Post -ContentType "application/json" -Body '{"poll_id":"poll1","option":"A"}'
 ```
 
 ---
@@ -96,7 +94,7 @@ curl -X POST http://localhost:8001/vote \
 ### Get poll results
 
 ```bash
-curl http://localhost:8001/poll/poll1
+Invoke-RestMethod -Uri "http://localhost:8001/poll/poll1"
 ```
 
 ---
@@ -104,7 +102,7 @@ curl http://localhost:8001/poll/poll1
 ### Node status
 
 ```bash
-curl http://localhost:8001/status
+Invoke-RestMethod -Uri "http://localhost:8001/status"
 ```
 
 ---
