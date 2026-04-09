@@ -90,6 +90,32 @@ Each node exposes both:
 - a REST API
 - a simple web UI
 
+### Open the UI
+Once the cluster is running, open one of the following URLs in your browser:
+- http://localhost:8001
+- http://localhost:8002
+- http://localhost:8003
+If you start more than 3 nodes, continue with the same numbering scheme:
+- node4 -> http://localhost:8004
+- node5 -> http://localhost:8005
+- ...
+
+## What you can do from the UI
+From the web interface you can:
+- submit a vote for a poll option
+- create a poll implicitly by submitting the first vote for a new poll id
+- inspect the list of known polls
+- retrieve current poll results
+- inspect the local node status
+
+## Expected behavior
+- when you submit a vote to one node, the vote is accepted locally immediately
+- the update is then propagated asynchronously to the other replicas
+- replicas may temporarily diverge
+- after enough synchronization time, all nodes converge to the same aggregated result
+
+## REST API
+
 ### Submit a vote
 
 ```bash
@@ -235,7 +261,7 @@ Every update is either:
 ### Isolate a node
 
 ```bash
-NODE3=$(docker compose ps -q node3)
+NODE3=$(docker compose -f docker-compose.generated.yml ps -q node3)
 docker network disconnect progetto_ds_default $NODE3
 docker network connect ds_isolated $NODE3
 ```
@@ -256,8 +282,8 @@ After reconnection, anti-entropy synchronizes the state.
 ### Node crash
 
 ```bash
-docker compose stop node2
-docker compose start node2
+docker compose -f docker-compose.generated.yml stop node2
+docker compose -f docker-compose.generated.yml start node2
 ```
 
 On restart:
@@ -310,8 +336,6 @@ Ensures convergence after:
 - `/vote` is not idempotent
 
 - Anti-entropy is not bandwidth optimized
-
-- Failure detector is basic
 
 ---
 
