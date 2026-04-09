@@ -83,6 +83,13 @@ This will:
 
 ---
 
+## Using the System
+
+Each node exposes both:
+
+- a REST API
+- a simple web UI
+
 ### Submit a vote
 
 ```bash

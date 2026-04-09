@@ -49,7 +49,7 @@ async def checkpoint_loop():
 
 
 @asynccontextmanager
-async def lifespan():
+async def lifespan(app: FastAPI):
     ensure_storage()
 
     # Recovery: checkpoint + WAL replay

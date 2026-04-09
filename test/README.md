@@ -30,21 +30,22 @@ Before running the tests, make sure the environment is correctly prepared.
 ### 1. Reset the system state
 
 To ensure reproducibility, remove all containers and persistent data:
+Required Tools
+
+- Docker
+- Docker compose
+- Python 3
+- Powershell
+- On Windows, Docker Desktop MUST be running
+
+Useful checks:
 
 ```powershell
-docker compose down -v
+docker info
+docker compose version
+python --version
+pwsh --version
 ```
-
-Then rebuild and start the system:
-
-```powershell
-docker compose up -d --build
-```
-
-This guarantees that:
-
-- all nodes start from an empty state
-- no previous WAL or checkpoint data affects the tests
 
 ---
 
@@ -129,6 +130,42 @@ Validates:
 
 ---
 
+### 05 — Idempotent Duplicated Internal Update
+
+Replays the same internal replicated update more than once and checks that the final state is not corrupted.
+
+Validates:
+
+- duplicate delivery tolerance
+- idempotent update handling
+- correctness of replicated merge behaviour
+
+---
+
+### 06 — Concurrent Updates Convergence
+
+Submits concurrent votes to multiple nodes and verifies that all replicas eventually converge to the expected counts.
+
+Validates:
+
+- concurrent request handling
+- distributed merge correctness
+- convergence after parallel writes
+
+---
+
+### 07 — Temporary Disconnection and Healing
+
+Temporarily disconnects one node from the others, submits updates while it is isolated, observes replica divergence, and then restores connectivity so that anti-entropy can reconcile the state.
+
+Validates:
+
+- continued availability of reachable nodes
+- temporary divergence during disconnection
+- eventual convergence after healing
+
+---
+
 ## Notes
 
 - Tests rely on **asynchronous behavior**, so convergence is verified using polling with timeouts.
@@ -140,5 +177,3 @@ Validates:
 ## Platform Note
 
 The current test suite is implemented in PowerShell and has been developed and verified on Windows.
-
-To make the tests cross-platform, equivalent Bash or Python integration scripts could be provided for Linux/macOS environments.
