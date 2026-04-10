@@ -10,7 +10,8 @@ function Ensure-ClusterRunning {
     if (-not (Test-Path $composeFile)) {
         Push-Location $projectRoot
         try {
-            python .\run_cluster.py $Nodes
+            $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+            & $pythonCmd "./run_cluster.py" $Nodes
         } finally {
             Pop-Location
         }
