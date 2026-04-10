@@ -2,9 +2,10 @@
 import time
 import asyncio
 import httpx
+import random
 from fastapi import APIRouter, Depends
 from urllib.parse import urlparse
-from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT, INTERNAL_TOKEN
+from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT, INTERNAL_TOKEN, FANOUT, REQUEST_TIMEOUT, CONNECT_TIMEOUT, STARTUP_DELAY
 from .security import verify_internal_token
 
 router = APIRouter()
@@ -83,9 +84,11 @@ async def heartbeat_loop():
 
     my_sender = f"http://{NODE_ID}:{PORT}"
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=1.0)) as client:
+    await asyncio.sleep(STARTUP_DELAY + random.uniform(0, 2))
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)) as client:
         while True:
-            for peer in PEERS:
+            for peer in heartbeat_targets():
                 try:
                     await client.post(
                         f"{peer}/internal/heartbeat",
@@ -98,6 +101,14 @@ async def heartbeat_loop():
 
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
+def heartbeat_targets(max_targets: int = FANOUT) -> list[str]:
+    states = get_peer_states()
+    candidates = [peer for peer in PEERS if states.get(peer) != "DEAD"]
+
+    if len(candidates) <= max_targets:
+        return candidates
+
+    return random.sample(candidates, max_targets)
 
 @router.get("/status")
 def status():

@@ -87,7 +87,7 @@ app.mount("/ui", StaticFiles(directory=str(UI_DIR), html=True), name="ui")
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/ui/")
+    return RedirectResponse(url="ui/")
 
 
 @app.get("/polls")

@@ -1,5 +1,8 @@
 export function baseUrl() {
-  return window.location.origin
+  const path = window.location.pathname
+  const uiIndex = path.indexOf("/ui/")
+  const basePath = uiIndex >= 0 ? path.substring(0, uiIndex) : ""
+  return `${window.location.origin}${basePath}`
 }
 
 export async function fetchJson(url, opts) {

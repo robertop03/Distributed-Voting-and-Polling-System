@@ -1,10 +1,10 @@
 import asyncio
 import logging
-
+import random
 import httpx
 from fastapi import APIRouter, HTTPException, Depends
 
-from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL, INTERNAL_TOKEN
+from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL, INTERNAL_TOKEN, FANOUT, REQUEST_TIMEOUT, CONNECT_TIMEOUT, STARTUP_DELAY, ANTI_ENTROPY_INTERVAL
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
 from .state import (
     would_change_update,
@@ -37,7 +37,7 @@ def get_replication_client() -> httpx.AsyncClient:
     global _replication_client
     if _replication_client is None:
         _replication_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(1.5, connect=0.5),
+            timeout=httpx.Timeout(REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
         )
     return _replication_client
 
@@ -46,7 +46,7 @@ def get_anti_entropy_client() -> httpx.AsyncClient:
     global _anti_entropy_client
     if _anti_entropy_client is None:
         _anti_entropy_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(2.0, connect=0.5),
+            timeout=httpx.Timeout(REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
         )
     return _anti_entropy_client
 
@@ -63,14 +63,24 @@ async def close_replication_clients() -> None:
         _anti_entropy_client = None
 
 
-def replication_targets() -> list[str]:
+def replication_targets(max_targets: int = FANOUT) -> list[str]:
     states = get_peer_states()
-    return [peer for peer in PEERS if states.get(peer) != "DEAD"]
+    candidates = [peer for peer in PEERS if states.get(peer) != "DEAD"]
+
+    if len(candidates) <= max_targets:
+        return candidates
+
+    return random.sample(candidates, max_targets)
 
 
-def anti_entropy_targets() -> list[str]:
+def anti_entropy_targets(max_targets: int = FANOUT) -> list[str]:
     states = get_peer_states()
-    return [peer for peer in PEERS if states.get(peer) != "DEAD"]
+    candidates = [peer for peer in PEERS if states.get(peer) != "DEAD"]
+
+    if len(candidates) <= max_targets:
+        return candidates
+
+    return random.sample(candidates, max_targets)
 
 
 async def _replicate_update_to_peer(
@@ -252,7 +262,7 @@ async def anti_entropy_loop() -> None:
         return
 
     # lascia assestare il cluster all'avvio
-    await asyncio.sleep(2)
+    await asyncio.sleep(STARTUP_DELAY + random.uniform(0, 3))
 
     while True:
         try:

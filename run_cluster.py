@@ -1,11 +1,12 @@
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 OUT_FILE = Path("docker-compose.generated.yml")
+NGINX_FILE = Path("nginx.conf")
 
 
-def build_service(node_index: int, total_nodes: int) -> str:
+def build_node_service(node_index: int, total_nodes: int) -> str:
     node_name = f"node{node_index}"
     port = 8000 + node_index
 
@@ -16,44 +17,101 @@ def build_service(node_index: int, total_nodes: int) -> str:
     peers_str = ",".join(peers)
 
     return f"""  {node_name}:
-    build: ./node
+    image: progetto_ds-node:latest
     env_file:
       - .env
     environment:
       - NODE_ID={node_name}
       - PORT={port}
       - PEERS={peers_str}
-      - HEARTBEAT_INTERVAL=1
-      - SUSPECT_TIMEOUT=3
-      - DEAD_TIMEOUT=6
-      - ANTI_ENTROPY_INTERVAL=1
+      - HEARTBEAT_INTERVAL=3
+      - SUSPECT_TIMEOUT=10
+      - DEAD_TIMEOUT=20
+      - ANTI_ENTROPY_INTERVAL=8
       - CHECKPOINT_INTERVAL=10
+      - CLUSTER_SIZE={total_nodes}
+      - BASE_STARTUP_DELAY=4
       - DATA_DIR=/data
-    ports:
-      - "{port}:{port}"
     volumes:
       - {node_name}_data:/data
 """
 
 
+def build_proxy_service() -> str:
+    return """  proxy:
+    image: nginx:alpine
+    depends_on:
+      - node1
+    ports:
+      - "18080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+"""
+
+
 def build_compose(total_nodes: int) -> str:
-    services = "".join(build_service(i, total_nodes) for i in range(1, total_nodes + 1))
+    node_services = "".join(build_node_service(i, total_nodes) for i in range(1, total_nodes + 1))
+    proxy_service = build_proxy_service()
     volumes = "".join(f"  node{i}_data:\n" for i in range(1, total_nodes + 1))
 
     return f"""services:
-{services}
+{proxy_service}{node_services}
 volumes:
 {volumes}
 """
 
 
-def generate_compose(total_nodes: int) -> None:
+def build_nginx_conf(total_nodes: int) -> str:
+    locations = []
+
+    for i in range(1, total_nodes + 1):
+        container_port = 8000 + i
+
+        locations.append(f"""        location = /node/{i} {{
+            return 301 /node/{i}/;
+        }}
+
+        location /node/{i}/ {{
+            proxy_pass http://node{i}:{container_port}/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }}
+""")
+
+    joined_locations = "\n".join(locations)
+
+    return f"""events {{}}
+
+http {{
+    server {{
+        listen 80;
+
+        location = / {{
+            default_type text/html;
+            return 200 "<html><body><h1>Distributed Voting Cluster</h1><p>Open a node UI at <code>/node/1/</code>, <code>/node/2/</code>, ...</p></body></html>";
+        }}
+
+{joined_locations}
+    }}
+}}
+"""
+
+
+def generate_files(total_nodes: int) -> None:
     OUT_FILE.write_text(build_compose(total_nodes), encoding="utf-8")
-    print(f"Generated {OUT_FILE} for {total_nodes} nodes.")
+    NGINX_FILE.write_text(build_nginx_conf(total_nodes), encoding="utf-8")
+    print(f"Generated {OUT_FILE} and {NGINX_FILE} for {total_nodes} nodes.")
 
 
 def run_compose() -> None:
-    cmd = ["docker", "compose", "-f", str(OUT_FILE), "up", "--build"]
+    cmd = ["docker", "compose", "-f", str(OUT_FILE), "up"]
+    subprocess.run(cmd, check=True)
+
+def build_node_image() -> None:
+    cmd = ["docker", "build", "-t", "progetto_ds-node:latest", "./node"]
     subprocess.run(cmd, check=True)
 
 
@@ -72,7 +130,8 @@ def main():
         print("Error: <num_nodes> must be at least 1.")
         sys.exit(1)
 
-    generate_compose(total_nodes)
+    generate_files(total_nodes)
+    build_node_image()
     run_compose()
 
 
