@@ -36,11 +36,11 @@ $jobs | Wait-Job | Receive-Job | Out-Null
 $jobs | Remove-Job
 
 Print-Step "Wait for convergence on all nodes"
-$snapshots = Wait-UntilAllNodesPollCounts @(8001, 8002, 8003) $poll 3 2 45
+$snapshots = Wait-UntilAllNodesPollCounts @(1, 2, 3) $poll 3 2 45
 
 $snapshots.GetEnumerator() | ForEach-Object {
     [PSCustomObject]@{
-        port = "$($_.Key)"
+        node = "$($_.Key)"
         response = $_.Value
     }
 } | ConvertTo-Json -Depth 10

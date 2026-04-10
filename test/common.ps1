@@ -1,19 +1,41 @@
-function Vote($port, $poll, $option) {
-    Invoke-RestMethod -Method POST "http://localhost:$port/vote" `
+$ErrorActionPreference = "Stop"
+
+function Get-DirectNodeUrl($nodeId) {
+    $port = 8000 + [int]$nodeId
+    return "http://localhost:$port"
+}
+
+function Get-InternalBaseUrl($port) {
+    return "http://localhost:$port"
+}
+
+function Vote($nodeId, $poll, $option) {
+    Invoke-RestMethod -Method POST "$(Get-DirectNodeUrl $nodeId)/vote" `
         -ContentType "application/json" `
         -Body "{""poll_id"":""$poll"",""option"":""$option""}"
 }
 
-function Get-Poll($port, $poll) {
-    Invoke-RestMethod "http://localhost:$port/poll/$poll"
+function Get-Poll($nodeId, $poll) {
+    Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/poll/$poll"
 }
 
-function Get-Status($port) {
-    Invoke-RestMethod "http://localhost:$port/status"
+function Get-Poll-Direct($nodeId, $poll) {
+    Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/poll/$poll"
+}
+
+function Get-Status($nodeId) {
+    Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/status"
 }
 
 function Get-Status_With-URL($url) {
     return Invoke-RestMethod -Uri "$url/status" -Method Get
+}
+
+function Post-InternalUpdate($port, $updateObj, $headers = @{}) {
+    Invoke-RestMethod -Method POST "$(Get-InternalBaseUrl $port)/internal/counter/update" `
+        -ContentType "application/json" `
+        -Headers $headers `
+        -Body ($updateObj | ConvertTo-Json -Depth 10)
 }
 
 function Wait-Seconds($s) {
@@ -41,26 +63,26 @@ function Get-CountValue($counts, $key) {
     return [int]$prop.Value
 }
 
-function Wait-UntilPollCounts($port, $poll, $expectedA, $expectedB, $timeoutSec = 25) {
+function Wait-UntilPollCounts($nodeId, $poll, $expectedA, $expectedB, $timeoutSec = 25) {
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     $last = $null
 
     while ((Get-Date) -lt $deadline) {
         try {
-            $r = Get-Poll $port $poll
+            $r = Get-Poll $nodeId $poll
             $last = $r
 
             $a = Get-CountValue $r.counts "A"
             $b = Get-CountValue $r.counts "B"
 
-            Write-Host "Waiting on port $port -> current counts: A=$a B=$b"
+            Write-Host "Waiting on node $nodeId -> current counts: A=$a B=$b"
 
             if ($a -eq $expectedA -and $b -eq $expectedB) {
                 return $r
             }
         }
         catch {
-            Write-Host "Waiting on port $port -> node not reachable yet"
+            Write-Host "Waiting on node $nodeId -> node not reachable yet"
         }
 
         Start-Sleep -Seconds 1
@@ -68,35 +90,35 @@ function Wait-UntilPollCounts($port, $poll, $expectedA, $expectedB, $timeoutSec 
 
     if ($null -ne $last) {
         $lastJson = $last | ConvertTo-Json -Depth 10
-        throw "Timeout waiting for poll '$poll' on port $port to reach A=$expectedA, B=$expectedB. Last response: $lastJson"
+        throw "Timeout waiting for poll '$poll' on node $nodeId to reach A=$expectedA, B=$expectedB. Last response: $lastJson"
     }
 
-    throw "Timeout waiting for poll '$poll' on port $port to reach A=$expectedA, B=$expectedB. No successful response received."
+    throw "Timeout waiting for poll '$poll' on node $nodeId to reach A=$expectedA, B=$expectedB. No successful response received."
 }
 
-function Wait-UntilAllNodesPollCounts($ports, $poll, $expectedA, $expectedB, $timeoutSec = 40) {
+function Wait-UntilAllNodesPollCounts($nodeIds, $poll, $expectedA, $expectedB, $timeoutSec = 40) {
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     $lastSnapshots = @{}
 
     while ((Get-Date) -lt $deadline) {
         $allOk = $true
 
-        foreach ($port in $ports) {
+        foreach ($nodeId in $nodeIds) {
             try {
-                $r = Get-Poll $port $poll
-                $lastSnapshots[$port] = $r
+                $r = Get-Poll $nodeId $poll
+                $lastSnapshots[$nodeId] = $r
 
                 $a = Get-CountValue $r.counts "A"
                 $b = Get-CountValue $r.counts "B"
 
-                Write-Host "Port $port -> A=$a B=$b"
+                Write-Host "Node $nodeId -> A=$a B=$b"
 
                 if ($a -ne $expectedA -or $b -ne $expectedB) {
                     $allOk = $false
                 }
             }
             catch {
-                Write-Host "Port $port -> not reachable yet"
+                Write-Host "Node $nodeId -> not reachable yet"
                 $allOk = $false
             }
         }
@@ -143,14 +165,8 @@ function Wait-ForPeerState($observerUrl, $peerName, $expectedStates, $timeoutSec
     return $false
 }
 
-function Post-InternalUpdate($port, $updateObj) {
-    Invoke-RestMethod -Method POST "http://localhost:$port/internal/counter/update" `
-        -ContentType "application/json" `
-        -Body ($updateObj | ConvertTo-Json)
-}
-
-function Get-CountsAB($port, $poll) {
-    $r = Get-Poll $port $poll
+function Get-CountsAB($nodeId, $poll) {
+    $r = Get-Poll $nodeId $poll
     return [PSCustomObject]@{
         A = Get-CountValue $r.counts "A"
         B = Get-CountValue $r.counts "B"
@@ -158,19 +174,23 @@ function Get-CountsAB($port, $poll) {
     }
 }
 
-function Wait-HttpReady($port, $timeoutSec = 30) {
+function Wait-HttpReadyDirect($nodeId, $timeoutSec = 30) {
     $deadline = (Get-Date).AddSeconds($timeoutSec)
 
     while ((Get-Date) -lt $deadline) {
         try {
-            Invoke-RestMethod -Method GET "http://localhost:$port/status" -TimeoutSec 2 | Out-Null
+            Invoke-RestMethod -Method GET "$(Get-DirectNodeUrl $nodeId)/status" -TimeoutSec 2 | Out-Null
             return
         } catch {
             Start-Sleep -Seconds 1
         }
     }
 
-    throw "Service on port $port did not become ready within $timeoutSec seconds"
+    throw "Service for node $nodeId did not become ready within $timeoutSec seconds"
+}
+
+function Wait-HttpReady($nodeId, $timeoutSec = 30) {
+    Wait-HttpReadyDirect $nodeId $timeoutSec
 }
 
 function Import-Env {

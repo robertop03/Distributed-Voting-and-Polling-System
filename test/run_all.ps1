@@ -17,14 +17,16 @@ function Ensure-ClusterRunning {
         return
     }
 
-    $runningNodes = @()
+    $runningServices = @()
     try {
-        $runningNodes = @(docker compose -f $composeFile ps --services --status running)
+        $runningServices = @(docker compose -f $composeFile ps --services --status running)
     } catch {
-        $runningNodes = @()
+        $runningServices = @()
     }
 
-    if ($runningNodes.Count -lt $Nodes) {
+    $expectedMin = $Nodes + 1  # proxy + nodes
+
+    if ($runningServices.Count -lt $expectedMin) {
         Push-Location $projectRoot
         try {
             docker compose -f $composeFile up -d --build | Out-Null
@@ -36,9 +38,9 @@ function Ensure-ClusterRunning {
 
 Ensure-ClusterRunning 3
 
-Wait-HttpReady 8001
-Wait-HttpReady 8002
-Wait-HttpReady 8003
+Wait-HttpReadyDirect 1 45
+Wait-HttpReadyDirect 2 45
+Wait-HttpReadyDirect 3 45
 
 Import-Env
 

@@ -32,6 +32,8 @@ def build_node_service(node_index: int, total_nodes: int) -> str:
       - CLUSTER_SIZE={total_nodes}
       - BASE_STARTUP_DELAY=4
       - DATA_DIR=/data
+    ports:
+      - "{port}:{port}"
     volumes:
       - {node_name}_data:/data
 """
