@@ -35,28 +35,28 @@ jobs:
           $ErrorActionPreference = "Continue"
           $success = 0
           $fail = 0
-
+      
           New-Item -ItemType Directory -Force -Path stress-logs | Out-Null
-
+      
           for ($i = 1; $i -le 20; $i++) {
               Write-Host ""
               Write-Host "==============================" -ForegroundColor Cyan
               Write-Host "RUN #$i" -ForegroundColor Cyan
               Write-Host "==============================" -ForegroundColor Cyan
-
+      
               $logFile = "stress-logs/run-$i.log"
-
+      
               try {
                   if (Test-Path "docker-compose.generated.yml") {
-                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>&1 | Tee-Object -FilePath $logFile -Append
+                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>> $logFile
                   }
-
+      
                   Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
                   Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
-
-                 ./test/run_all.ps1 *>> $logFile
+      
+                  ./test/run_all.ps1 *>> $logFile
                   $exitCode = $LASTEXITCODE
-                  
+      
                   if ($exitCode -eq 0) {
                       Write-Host "[OK] Run $i succeeded" -ForegroundColor Green
                       $success++
@@ -72,21 +72,23 @@ jobs:
                   Write-Host "[FAIL] Run $i crashed: $($_.Exception.Message)" -ForegroundColor Red
                   $fail++
                   "Crash: $($_.Exception.Message)" | Tee-Object -FilePath $logFile -Append
+                  Write-Host "---- run-$i.log ----" -ForegroundColor Yellow
+                  Get-Content $logFile
               }
               finally {
                   if (Test-Path "docker-compose.generated.yml") {
-                      Write-Host "---- docker compose ps ----" | Tee-Object -FilePath $logFile -Append
+                      "---- docker compose ps ----" | Tee-Object -FilePath $logFile -Append
                       docker compose -f docker-compose.generated.yml ps *>&1 | Tee-Object -FilePath $logFile -Append
-
-                      Write-Host "---- docker compose logs ----" | Tee-Object -FilePath $logFile -Append
+      
+                      "---- docker compose logs ----" | Tee-Object -FilePath $logFile -Append
                       docker compose -f docker-compose.generated.yml logs --no-color *>&1 | Tee-Object -FilePath $logFile -Append
-
+      
                       docker compose -f docker-compose.generated.yml down -v --remove-orphans *>&1 | Tee-Object -FilePath $logFile -Append
                   }
-
+      
                   Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
                   Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
-
+      
                   docker network prune -f | Out-Null
                   Start-Sleep -Seconds 2
               }
@@ -98,7 +100,7 @@ jobs:
           Write-Host "==============================" -ForegroundColor Yellow
           Write-Host "Success: $success"
           Write-Host "Fail: $fail"
-
+      
           if ($fail -gt 0) {
               exit 1
           }
