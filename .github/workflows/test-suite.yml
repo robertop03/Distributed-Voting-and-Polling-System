@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Verifica runner
+      - name: Verify runner
         run: |
           uname -a
           docker --version
@@ -23,13 +23,13 @@ jobs:
           python3 --version
           pwsh --version
 
-      - name: Crea file .env
+      - name: Create .env file
         run: |
           cat > .env <<EOF
           INTERNAL_TOKEN=my-token
           EOF
 
-      - name: Esegui stress test
+      - name: Run stress test
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
@@ -48,18 +48,11 @@ jobs:
 
               try {
                   if (Test-Path "docker-compose.generated.yml") {
-                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>> $logFile
+                      docker compose -f docker-compose.generated.yml down -v --remove-orphans *>&1 | Tee-Object -FilePath $logFile -Append
                   }
 
-                  python3 -c "from run_cluster import generate_compose; generate_compose(3)" *>&1 | Tee-Object -FilePath $logFile -Append
-
-                  if (-not (Test-Path "docker-compose.generated.yml")) {
-                      throw "docker-compose.generated.yml was not generated"
-                  }
-
-                  docker compose -f docker-compose.generated.yml up -d --build *>&1 | Tee-Object -FilePath $logFile -Append
-
-                  Start-Sleep -Seconds 5
+                  Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
+                  Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
 
                   ./test/run_all.ps1 *>&1 | Tee-Object -FilePath $logFile -Append
 
@@ -89,6 +82,8 @@ jobs:
                   }
 
                   Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
+                  Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
+
                   docker network prune -f | Out-Null
                   Start-Sleep -Seconds 2
               }
