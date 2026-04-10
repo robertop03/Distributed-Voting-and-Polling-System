@@ -109,7 +109,7 @@ def generate_files(total_nodes: int) -> None:
 
 
 def run_compose() -> None:
-    cmd = ["docker", "compose", "-f", str(OUT_FILE), "up"]
+    cmd = ["docker", "compose", "-f", str(OUT_FILE), "up", "-d"]
     subprocess.run(cmd, check=True)
 
 def build_node_image() -> None:
