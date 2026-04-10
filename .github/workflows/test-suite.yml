@@ -54,14 +54,17 @@ jobs:
                   Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
                   Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
 
-                  ./test/run_all.ps1 *>&1 | Tee-Object -FilePath $logFile -Append
-
-                  if ($LASTEXITCODE -eq 0) {
+                 ./test/run_all.ps1 *>> $logFile
+                  $exitCode = $LASTEXITCODE
+                  
+                  if ($exitCode -eq 0) {
                       Write-Host "[OK] Run $i succeeded" -ForegroundColor Green
                       $success++
                   }
                   else {
-                      Write-Host "[FAIL] Run $i failed (exit code $LASTEXITCODE)" -ForegroundColor Red
+                      Write-Host "[FAIL] Run $i failed (exit code $exitCode)" -ForegroundColor Red
+                      Write-Host "---- run-$i.log ----" -ForegroundColor Yellow
+                      Get-Content $logFile
                       $fail++
                   }
               }
