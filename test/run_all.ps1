@@ -6,34 +6,20 @@ function Ensure-ClusterRunning {
 
     $projectRoot = Split-Path $PSScriptRoot -Parent
     $composeFile = Join-Path $projectRoot "docker-compose.generated.yml"
+    $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
 
-    if (-not (Test-Path $composeFile)) {
-        Push-Location $projectRoot
-        try {
-            $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-            & $pythonCmd "./run_cluster.py" $Nodes
-        } finally {
-            Pop-Location
-        }
-        return
-    }
-
-    $runningServices = @()
+    Push-Location $projectRoot
     try {
-        $runningServices = @(docker compose -f $composeFile ps --services --status running)
-    } catch {
-        $runningServices = @()
-    }
-
-    $expectedMin = $Nodes + 1  # proxy + nodes
-
-    if ($runningServices.Count -lt $expectedMin) {
-        Push-Location $projectRoot
-        try {
-            docker compose -f $composeFile up -d --build | Out-Null
-        } finally {
-            Pop-Location
+        if (Test-Path $composeFile) {
+            docker compose -f $composeFile down -v --remove-orphans | Out-Null
         }
+
+        Remove-Item -Force "docker-compose.generated.yml" -ErrorAction SilentlyContinue
+        Remove-Item -Force "nginx.conf" -ErrorAction SilentlyContinue
+
+        & $pythonCmd "./run_cluster.py" $Nodes "--expose-nodes"
+    } finally {
+        Pop-Location
     }
 }
 

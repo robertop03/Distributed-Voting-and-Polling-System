@@ -50,4 +50,4 @@ htmlcov/
 
 docker-compose.generated.yml
 
-ngix.conf
+nginx.conf

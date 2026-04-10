@@ -6,9 +6,12 @@ This project implements a **Distributed Voting and Polling System** composed of 
 
 Each node:
 
-- accepts votes independently through a REST API
-- maintains a local replica of the voting state
-- propagates updates to other nodes on a best-effort basis
+- exposes a REST API for voting and querying polls
+- maintains local state using WAL (Write-Ahead Logging) and checkpointing
+- replicates updates using anti-entropy mechanisms
+- detects failures using heartbeat-based monitoring
+
+A reverse proxy (Nginx) is also generated automatically to allow easy manual access to node APIs through a single entry point.
 
 Updates are disseminated without coordination or quorum requirements.
 If some replicas miss an update due to failures or partitions, periodic anti-entropy synchronization guarantees eventual convergence.
@@ -40,14 +43,6 @@ docker compose version
 python --version
 ```
 
-On Windows, you may need to use:
-
-```bash
-py --version
-```
-
----
-
 ## Clone the Repository
 
 ```bash
@@ -63,25 +58,60 @@ cd Distributed-Voting-and-Polling-System
 
 The system can be started with a configurable number of nodes.
 
+```bash
+python run_cluster.py <num_nodes> [--expose-nodes]
+```
+
 Example (3 nodes):
 
 ```bash
 python run_cluster.py 3
 ```
 
-You can choose any number of nodes:
+### Deployment Modes
+
+## 1. Default Mode (Recommended)
 
 ```bash
 python run_cluster.py 5
 ```
 
-This will:
+- only the proxy is exposed
+- nodes are accessible internally
+- clean and scalable setup
 
-- generate a Docker Compose configuration dynamically
-- start a cluster of N nodes
-- assign ports `8001 ... 800N`
+## 2. Test / Debug Mode
 
----
+```bash
+python run_cluster.py 5 --expose-nodes
+```
+
+- nodes are also exposed on host ports
+- required for automated testing
+
+## Why Two Modes?
+
+# Proxy (Default mode)
+
+Used for:
+
+- manual interaction
+- UI access
+  Advantages:
+- single entry point
+- no port explosion
+- closer to real deployment
+
+# Direct Node Access (test mode)
+
+Used for:
+
+- automated tests
+- crash recovery validation
+- failure injection scenarios
+  Advantages:
+- avoids transient proxy errors (e.g., 502 during restart)
+- allows precise control over node behavior
 
 ## Using the System
 
@@ -91,17 +121,21 @@ Each node exposes both:
 - a simple web UI
 
 ### Open the UI
+
 Once the cluster is running, open one of the following URLs in your browser:
-- http://localhost:8001
-- http://localhost:8002
-- http://localhost:8003
-If you start more than 3 nodes, continue with the same numbering scheme:
-- node4 -> http://localhost:8004
-- node5 -> http://localhost:8005
+
+- http://localhost:18080/node/1/
+- http://localhost:18080/node/2/
+- http://localhost:18080/node/3/
+  If you start more than 3 nodes, continue with the same numbering scheme:
+- node4 -> http://localhost:18080/node/4/
+- node5 -> http://localhost:18080/node/5/
 - ...
 
 ## What you can do from the UI
+
 From the web interface you can:
+
 - submit a vote for a poll option
 - create a poll implicitly by submitting the first vote for a new poll id
 - inspect the list of known polls
@@ -109,6 +143,7 @@ From the web interface you can:
 - inspect the local node status
 
 ## Expected behavior
+
 - when you submit a vote to one node, the vote is accepted locally immediately
 - the update is then propagated asynchronously to the other replicas
 - replicas may temporarily diverge

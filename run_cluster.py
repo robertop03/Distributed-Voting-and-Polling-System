@@ -6,7 +6,7 @@ OUT_FILE = Path("docker-compose.generated.yml")
 NGINX_FILE = Path("nginx.conf")
 
 
-def build_node_service(node_index: int, total_nodes: int) -> str:
+def build_node_service(node_index: int, total_nodes: int, expose_node_ports: bool = False) -> str:
     node_name = f"node{node_index}"
     port = 8000 + node_index
 
@@ -15,6 +15,8 @@ def build_node_service(node_index: int, total_nodes: int) -> str:
         if j != node_index:
             peers.append(f"http://node{j}:{8000 + j}")
     peers_str = ",".join(peers)
+
+    ports_block = f'    ports:\n      - "{port}:{port}"\n' if expose_node_ports else ""
 
     return f"""  {node_name}:
     image: progetto_ds-node:latest
@@ -32,9 +34,7 @@ def build_node_service(node_index: int, total_nodes: int) -> str:
       - CLUSTER_SIZE={total_nodes}
       - BASE_STARTUP_DELAY=4
       - DATA_DIR=/data
-    ports:
-      - "{port}:{port}"
-    volumes:
+{ports_block}    volumes:
       - {node_name}_data:/data
 """
 
@@ -51,8 +51,11 @@ def build_proxy_service() -> str:
 """
 
 
-def build_compose(total_nodes: int) -> str:
-    node_services = "".join(build_node_service(i, total_nodes) for i in range(1, total_nodes + 1))
+def build_compose(total_nodes: int, expose_node_ports: bool = False) -> str:
+    node_services = "".join(
+        build_node_service(i, total_nodes, expose_node_ports)
+        for i in range(1, total_nodes + 1)
+    )
     proxy_service = build_proxy_service()
     volumes = "".join(f"  node{i}_data:\n" for i in range(1, total_nodes + 1))
 
@@ -102,15 +105,19 @@ http {{
 """
 
 
-def generate_files(total_nodes: int) -> None:
-    OUT_FILE.write_text(build_compose(total_nodes), encoding="utf-8")
+def generate_files(total_nodes: int, expose_node_ports: bool = False) -> None:
+    OUT_FILE.write_text(build_compose(total_nodes, expose_node_ports), encoding="utf-8")
     NGINX_FILE.write_text(build_nginx_conf(total_nodes), encoding="utf-8")
-    print(f"Generated {OUT_FILE} and {NGINX_FILE} for {total_nodes} nodes.")
+    print(
+        f"Generated {OUT_FILE} and {NGINX_FILE} for {total_nodes} nodes "
+        f"(expose_node_ports={expose_node_ports})."
+    )
 
 
 def run_compose() -> None:
     cmd = ["docker", "compose", "-f", str(OUT_FILE), "up", "-d"]
     subprocess.run(cmd, check=True)
+
 
 def build_node_image() -> None:
     cmd = ["docker", "build", "-t", "progetto_ds-node:latest", "./node"]
@@ -118,8 +125,8 @@ def build_node_image() -> None:
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python run_cluster.py <num_nodes>")
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print("Usage: python run_cluster.py <num_nodes> [--expose-nodes]")
         sys.exit(1)
 
     try:
@@ -132,7 +139,14 @@ def main():
         print("Error: <num_nodes> must be at least 1.")
         sys.exit(1)
 
-    generate_files(total_nodes)
+    expose_node_ports = False
+    if len(sys.argv) == 3:
+        if sys.argv[2] != "--expose-nodes":
+            print("Error: only supported optional flag is --expose-nodes")
+            sys.exit(1)
+        expose_node_ports = True
+
+    generate_files(total_nodes, expose_node_ports)
     build_node_image()
     run_compose()
 
