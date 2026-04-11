@@ -4,7 +4,7 @@ import random
 import httpx
 from fastapi import APIRouter, HTTPException, Depends
 
-from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL, INTERNAL_TOKEN, FANOUT, REQUEST_TIMEOUT, CONNECT_TIMEOUT, STARTUP_DELAY, ANTI_ENTROPY_INTERVAL
+from .config import PEERS, NODE_ID, ANTI_ENTROPY_INTERVAL, INTERNAL_TOKEN, FANOUT, REQUEST_TIMEOUT, CONNECT_TIMEOUT, STARTUP_DELAY
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
 from .state import (
     would_change_update,
