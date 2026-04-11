@@ -124,12 +124,12 @@ Each node exposes both:
 
 Once the cluster is running, open one of the following URLs in your browser:
 
-- http://localhost:18080/node/1/
-- http://localhost:18080/node/2/
-- http://localhost:18080/node/3/
+- http://localhost:18080/node/1/ui/
+- http://localhost:18080/node/2/ui/
+- http://localhost:18080/node/3/ui/
   If you start more than 3 nodes, continue with the same numbering scheme:
-- node4 -> http://localhost:18080/node/4/
-- node5 -> http://localhost:18080/node/5/
+- node4 -> http://localhost:18080/node/4/ui/
+- node5 -> http://localhost:18080/node/5/ui/
 - ...
 
 ## What you can do from the UI
@@ -154,7 +154,7 @@ From the web interface you can:
 ### Submit a vote
 
 ```bash
-Invoke-RestMethod -Uri "http://localhost:8001/vote" -Method Post -ContentType "application/json" -Body '{"poll_id":"poll1","option":"A"}'
+Invoke-RestMethod -Uri "http://localhost:18080/node/2/vote" -Method Post -ContentType "application/json" -Body '{"poll_id":"poll1","option":"A"}'
 ```
 
 ---
@@ -162,7 +162,7 @@ Invoke-RestMethod -Uri "http://localhost:8001/vote" -Method Post -ContentType "a
 ### Get poll results
 
 ```bash
-Invoke-RestMethod -Uri "http://localhost:8001/poll/poll1"
+Invoke-RestMethod -Uri "http://localhost:18080/node/1/poll/poll1"
 ```
 
 ---
@@ -170,7 +170,7 @@ Invoke-RestMethod -Uri "http://localhost:8001/poll/poll1"
 ### Node status
 
 ```bash
-Invoke-RestMethod -Uri "http://localhost:8001/status"
+Invoke-RestMethod -Uri "http://localhost:18080/node/1/status"
 ```
 
 ---

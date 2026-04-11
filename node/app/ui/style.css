@@ -213,3 +213,16 @@ code {
   color: #0b0e14;
   border-color: var(--accent);
 }
+
+.peer-link {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.peer-link:hover {
+  text-decoration: underline;
+}

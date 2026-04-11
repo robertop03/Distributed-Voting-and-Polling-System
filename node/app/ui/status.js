@@ -25,8 +25,23 @@ export async function refreshStatus() {
       const tr = document.createElement("tr")
 
       const tdPeer = document.createElement("td")
-      tdPeer.textContent = p.peer
 
+      const match = String(p.peer).match(/node(\d+)/)
+      const nodeNum = match ? match[1] : null
+
+      if (nodeNum) {
+        const url = `${window.location.origin}/node/${nodeNum}/ui/`
+
+        const a = document.createElement("a")
+        a.href = url
+        a.textContent = url
+        a.className = "peer-link"
+        a.target = "_blank"
+
+        tdPeer.appendChild(a)
+      } else {
+        tdPeer.textContent = p.peer
+      }
       const tdState = document.createElement("td")
       tdState.className = `badge ${cls}`
       tdState.textContent = p.state

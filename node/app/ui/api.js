@@ -8,8 +8,10 @@ export function baseUrl() {
 export async function fetchJson(url, opts) {
   const resp = await fetch(url, opts)
   if (!resp.ok) {
-    const txt = await resp.text()
-    throw new Error(`${resp.status} ${resp.statusText}: ${txt}`)
+    if (resp.status === 502 || resp.status === 503 || resp.status === 504) {
+      throw new Error("This node is temporarily unavailable or restarting.")
+    }
+    throw new Error(`${resp.status} ${resp.statusText}`)
   }
   return resp.json()
 }
