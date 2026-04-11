@@ -1,16 +1,15 @@
 from typing import Dict, List
-import threading
 
 from .config import NODE_ID
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
+from .locks import state_lock
 
 # g_counter[poll_id][option][node_id] = int
 g_counter: Dict[str, Dict[str, Dict[str, int]]] = {}
-_state_lock = threading.RLock()
 
 
 def list_polls() -> List[str]:
-    with _state_lock:
+    with state_lock:
         return list(g_counter.keys())
 
 
@@ -29,8 +28,12 @@ def build_local_increment_update(poll_id: str, option: str) -> CounterUpdate:
     """
     Compute the next local CRDT increment without applying it yet.
     This is useful for WAL-before-apply.
+
+    WARNING: there is a window between this call and apply_update() where
+    another writer could modify the counter. Use increment_local_and_get_update()
+    instead when atomicity is required (e.g. the /vote endpoint).
     """
-    with _state_lock:
+    with state_lock:
         ensure_option(poll_id, option)
         current = g_counter[poll_id][option].get(NODE_ID, 0) + 1
         return CounterUpdate(
@@ -41,8 +44,22 @@ def build_local_increment_update(poll_id: str, option: str) -> CounterUpdate:
         )
 
 
+def increment_local_and_get_update(poll_id: str, option: str) -> CounterUpdate:
+    with state_lock:
+        ensure_option(poll_id, option)
+        prev = g_counter[poll_id][option].get(NODE_ID, 0)
+        new_value = prev + 1
+        g_counter[poll_id][option][NODE_ID] = new_value
+        return CounterUpdate(
+            poll_id=poll_id,
+            option=option,
+            node_id=NODE_ID,
+            value=new_value,
+        )
+
+
 def would_change_update(upd: CounterUpdate) -> bool:
-    with _state_lock:
+    with state_lock:
         ensure_option(upd.poll_id, upd.option)
         prev = g_counter[upd.poll_id][upd.option].get(upd.node_id, 0)
         return upd.value > prev
@@ -53,7 +70,7 @@ def apply_update(upd: CounterUpdate) -> bool:
     Apply one CRDT component update with max-merge semantics.
     Returns True iff the in-memory state changed.
     """
-    with _state_lock:
+    with state_lock:
         ensure_option(upd.poll_id, upd.option)
         prev = g_counter[upd.poll_id][upd.option].get(upd.node_id, 0)
         newv = max(prev, upd.value)
@@ -63,7 +80,7 @@ def apply_update(upd: CounterUpdate) -> bool:
 
 
 def export_poll_state(poll_id: str) -> PollCRDTState:
-    with _state_lock:
+    with state_lock:
         poll_data = g_counter.get(poll_id, {})
         ensure_poll(poll_id)
         counts = {opt: dict(nodes) for opt, nodes in poll_data.items()}
@@ -71,7 +88,7 @@ def export_poll_state(poll_id: str) -> PollCRDTState:
 
 
 def export_cluster_state() -> ClusterCRDTState:
-    with _state_lock:
+    with state_lock:
         polls: Dict[str, PollCRDTState] = {}
         for poll_id, poll_data in g_counter.items():
             counts = {opt: dict(nodes) for opt, nodes in poll_data.items()}
@@ -80,7 +97,7 @@ def export_cluster_state() -> ClusterCRDTState:
 
 
 def query_poll_counts(poll_id: str) -> Dict[str, int]:
-    with _state_lock:
+    with state_lock:
         poll_data = g_counter.get(poll_id, {})
         return {opt: sum(nodes.values()) for opt, nodes in poll_data.items()}
 
@@ -91,7 +108,7 @@ def replace_cluster_state(other: ClusterCRDTState) -> None:
     Used only during startup recovery.
     """
     global g_counter
-    with _state_lock:
+    with state_lock:
         new_state: Dict[str, Dict[str, Dict[str, int]]] = {}
         for poll_id, poll_state in other.polls.items():
             new_state[poll_id] = {}
@@ -110,7 +127,7 @@ def extract_new_updates_from_poll_state(
     """
     updates: List[CounterUpdate] = []
 
-    with _state_lock:
+    with state_lock:
         ensure_poll(poll_id)
         for opt, nodes in other.counts.items():
             ensure_option(poll_id, opt)
@@ -138,7 +155,7 @@ def extract_new_updates_from_cluster_state(
     """
     updates: List[CounterUpdate] = []
 
-    with _state_lock:
+    with state_lock:
         for poll_id, poll_state in other.polls.items():
             ensure_poll(poll_id)
             for opt, nodes in poll_state.counts.items():

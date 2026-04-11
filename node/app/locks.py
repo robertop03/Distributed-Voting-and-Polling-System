@@ -1,3 +1,3 @@
 import threading
 
-durability_lock = threading.RLock()
+state_lock = threading.RLock()

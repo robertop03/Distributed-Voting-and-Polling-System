@@ -16,7 +16,7 @@ from .state import (
     g_counter,
 )
 from .storage import append_wal_update
-from .locks import durability_lock
+from .locks import state_lock
 from .security import verify_internal_token
 from .failure import get_peer_states
 
@@ -144,7 +144,7 @@ def internal_counter_update(
         upd.value,
     )
 
-    with durability_lock:
+    with state_lock:
         prev = g_counter.get(upd.poll_id, {}).get(upd.option, {}).get(upd.node_id, 0)
         changed = would_change_update(upd)
 
@@ -176,7 +176,7 @@ def internal_cluster_merge(
     other: ClusterCRDTState,
     _: None = Depends(verify_internal_token),
 ):
-    with durability_lock:
+    with state_lock:
         updates = extract_new_updates_from_cluster_state(other)
         for upd in updates:
             append_wal_update(upd)
@@ -199,7 +199,7 @@ def internal_merge(
     other: PollCRDTState,
     _: None = Depends(verify_internal_token),
 ):
-    with durability_lock:
+    with state_lock:
         updates = extract_new_updates_from_poll_state(poll_id, other)
         for upd in updates:
             append_wal_update(upd)
@@ -225,7 +225,7 @@ async def internal_sync(poll_id: str, _: None = Depends(verify_internal_token)):
             st.raise_for_status()
             other = PollCRDTState(**st.json())
 
-            with durability_lock:
+            with state_lock:
                 updates = extract_new_updates_from_poll_state(poll_id, other)
                 for upd in updates:
                     append_wal_update(upd)
@@ -274,7 +274,7 @@ async def anti_entropy_loop() -> None:
                     return_exceptions=True,
                 )
 
-                with durability_lock:
+                with state_lock:
                     for other in states:
                         if isinstance(other, Exception) or other is None:
                             continue

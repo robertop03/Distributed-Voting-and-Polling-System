@@ -5,12 +5,12 @@ import logging
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
-from .locks import durability_lock
+from .locks import state_lock
 from .config import NODE_ID, CHECKPOINT_INTERVAL
 from .models import VoteIn
 
 from .state import (
-    build_local_increment_update,
+    increment_local_and_get_update,
     apply_update,
     query_poll_counts,
     replace_cluster_state,
@@ -42,7 +42,7 @@ async def checkpoint_loop():
         await asyncio.sleep(CHECKPOINT_INTERVAL)
         from .state import export_cluster_state
 
-        with durability_lock:
+        with state_lock:
             state = export_cluster_state()
             write_checkpoint(state)
             truncate_wal()
@@ -98,10 +98,9 @@ def get_polls():
 
 @app.post("/vote")
 async def vote(v: VoteIn):
-    with durability_lock:
-        upd = build_local_increment_update(v.poll_id, v.option)
+    with state_lock:
+        upd = increment_local_and_get_update(v.poll_id, v.option)
         append_wal_update(upd)
-        apply_update(upd)
 
     asyncio.create_task(replicate_update_to_peers(upd))
     return {"ok": True, "node": NODE_ID, "update": upd.model_dump()}
