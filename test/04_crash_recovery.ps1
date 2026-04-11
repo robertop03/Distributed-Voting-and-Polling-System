@@ -22,7 +22,7 @@ try {
     Wait-HttpReadyDirect 3 45
 
     Print-Step "Query node3 (isolated)"
-    $r = Get-Poll-Direct 3 $poll
+    $r = Get-Poll 3 $poll
     $r
 
     $a = Get-CountValue $r.counts "A"

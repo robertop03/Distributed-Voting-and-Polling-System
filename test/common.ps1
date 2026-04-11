@@ -19,10 +19,6 @@ function Get-Poll($nodeId, $poll) {
     Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/poll/$poll"
 }
 
-function Get-Poll-Direct($nodeId, $poll) {
-    Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/poll/$poll"
-}
-
 function Get-Status($nodeId) {
     Invoke-RestMethod "$(Get-DirectNodeUrl $nodeId)/status"
 }
