@@ -62,24 +62,11 @@ async def close_replication_clients() -> None:
         await _anti_entropy_client.aclose()
         _anti_entropy_client = None
 
-
-def replication_targets(max_targets: int = FANOUT) -> list[str]:
+def _live_peers_sample(max_targets: int = FANOUT) -> list[str]:
     states = get_peer_states()
     candidates = [peer for peer in PEERS if states.get(peer) != "DEAD"]
-
     if len(candidates) <= max_targets:
         return candidates
-
-    return random.sample(candidates, max_targets)
-
-
-def anti_entropy_targets(max_targets: int = FANOUT) -> list[str]:
-    states = get_peer_states()
-    candidates = [peer for peer in PEERS if states.get(peer) != "DEAD"]
-
-    if len(candidates) <= max_targets:
-        return candidates
-
     return random.sample(candidates, max_targets)
 
 
@@ -107,7 +94,7 @@ async def _replicate_update_to_peer(
 
 
 async def replicate_update_to_peers(upd: CounterUpdate) -> None:
-    targets = replication_targets()
+    targets = _live_peers_sample()
     if not targets:
         return
 
@@ -210,7 +197,7 @@ def internal_merge(
 
 @router.post("/internal/sync/{poll_id}")
 async def internal_sync(poll_id: str, _: None = Depends(verify_internal_token)):
-    targets = replication_targets()
+    targets = _live_peers_sample()
     if not targets:
         raise HTTPException(status_code=503, detail="No peer reachable for sync")
 
@@ -266,7 +253,7 @@ async def anti_entropy_loop() -> None:
 
     while True:
         try:
-            targets = anti_entropy_targets()
+            targets = _live_peers_sample()
 
             if targets:
                 states = await asyncio.gather(
