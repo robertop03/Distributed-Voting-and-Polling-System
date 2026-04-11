@@ -8,10 +8,10 @@ from pydantic import ValidationError
 
 from .config import DATA_DIR, CHECKPOINT_FILE, WAL_FILE
 from .models import CounterUpdate, ClusterCRDTState
+from .locks import storage_lock
 
 logger = logging.getLogger(__name__)
 
-_storage_lock = threading.RLock()
 
 
 def ensure_storage() -> None:
@@ -41,7 +41,7 @@ def append_wal_update(upd: CounterUpdate) -> None:
 
     line = json.dumps(record, ensure_ascii=False)
 
-    with _storage_lock:
+    with storage_lock:
         with open(WAL_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
             f.flush()
@@ -50,7 +50,7 @@ def append_wal_update(upd: CounterUpdate) -> None:
 
 def load_checkpoint() -> ClusterCRDTState:
     ensure_storage()
-    with _storage_lock:
+    with storage_lock:
         with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -66,7 +66,7 @@ def write_checkpoint(state: ClusterCRDTState) -> None:
     tmp_file = CHECKPOINT_FILE + ".tmp"
     payload = state.model_dump()
 
-    with _storage_lock:
+    with storage_lock:
         with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
             f.flush()
@@ -80,7 +80,7 @@ def load_wal_updates() -> List[CounterUpdate]:
     updates: List[CounterUpdate] = []
     skipped = 0
 
-    with _storage_lock:
+    with storage_lock:
         with open(WAL_FILE, "r", encoding="utf-8") as f:
             for line_no, raw_line in enumerate(f, start=1):
                 line = raw_line.strip()
@@ -137,7 +137,7 @@ def load_wal_updates() -> List[CounterUpdate]:
 
 def truncate_wal() -> None:
     ensure_storage()
-    with _storage_lock:
+    with storage_lock:
         with open(WAL_FILE, "w", encoding="utf-8") as f:
             f.truncate(0)
             f.flush()
