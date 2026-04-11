@@ -7,16 +7,12 @@ from fastapi import APIRouter, Depends
 from urllib.parse import urlparse
 from .config import PEERS, NODE_ID, PORT, HEARTBEAT_INTERVAL, SUSPECT_TIMEOUT, DEAD_TIMEOUT, INTERNAL_TOKEN, FANOUT, REQUEST_TIMEOUT, CONNECT_TIMEOUT, STARTUP_DELAY
 from .security import verify_internal_token
+from .utils import internal_auth_headers
 
 router = APIRouter()
 
 # Manteniamo lo stato solo per i peer "ufficiali" (quelli in PEERS)
 peer_last_seen = {peer: 0.0 for peer in PEERS}
-
-def internal_auth_headers() -> dict[str, str]:
-    if not INTERNAL_TOKEN:
-        return {}
-    return {"X-Internal-Token": INTERNAL_TOKEN}
 
 
 def _normalize_sender(sender: str) -> str:

@@ -15,6 +15,7 @@ from .state import (
     extract_new_updates_from_cluster_state,
     g_counter,
 )
+from .utils import internal_auth_headers
 from .storage import append_wal_update
 from .locks import state_lock
 from .security import verify_internal_token
@@ -25,12 +26,6 @@ router = APIRouter()
 
 _replication_client: httpx.AsyncClient | None = None
 _anti_entropy_client: httpx.AsyncClient | None = None
-
-
-def internal_auth_headers() -> dict[str, str]:
-    if not INTERNAL_TOKEN:
-        return {}
-    return {"X-Internal-Token": INTERNAL_TOKEN}
 
 
 def get_replication_client() -> httpx.AsyncClient:
