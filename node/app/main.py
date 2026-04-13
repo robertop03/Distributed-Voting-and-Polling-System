@@ -10,7 +10,7 @@ from .config import NODE_ID, CHECKPOINT_INTERVAL
 from .models import VoteIn
 
 from .state import (
-    increment_local_and_get_update,
+    build_local_update,
     apply_update,
     query_poll_counts,
     replace_cluster_state,
@@ -99,8 +99,9 @@ def get_polls():
 @app.post("/vote")
 async def vote(v: VoteIn):
     with state_lock:
-        upd = increment_local_and_get_update(v.poll_id, v.option)
+        upd = build_local_update(v.poll_id, v.option, NODE_ID)
         append_wal_update(upd)
+        apply_update(upd)
 
     asyncio.create_task(replicate_update_to_peers(upd))
     return {"ok": True, "node": NODE_ID, "update": upd.model_dump()}

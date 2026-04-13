@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-from .config import NODE_ID
 from .models import CounterUpdate, PollCRDTState, ClusterCRDTState
 from .locks import state_lock
 
@@ -24,46 +23,27 @@ def ensure_option(poll_id: str, option: str) -> None:
         g_counter[poll_id][option] = {}
 
 
-def build_local_increment_update(poll_id: str, option: str) -> CounterUpdate:
-    """
-    Compute the next local CRDT increment without applying it yet.
-    This is useful for WAL-before-apply.
+def build_local_update(poll_id: str, option: str, node_id: str) -> CounterUpdate:
+    ensure_option(poll_id, option)
+    current = g_counter[poll_id][option].get(node_id, 0)
+    new_value = current + 1
 
-    WARNING: there is a window between this call and apply_update() where
-    another writer could modify the counter. Use increment_local_and_get_update()
-    instead when atomicity is required (e.g. the /vote endpoint).
-    """
-    with state_lock:
-        ensure_option(poll_id, option)
-        current = g_counter[poll_id][option].get(NODE_ID, 0) + 1
-        return CounterUpdate(
-            poll_id=poll_id,
-            option=option,
-            node_id=NODE_ID,
-            value=current,
-        )
-
-
-def increment_local_and_get_update(poll_id: str, option: str) -> CounterUpdate:
-    with state_lock:
-        ensure_option(poll_id, option)
-        prev = g_counter[poll_id][option].get(NODE_ID, 0)
-        new_value = prev + 1
-        g_counter[poll_id][option][NODE_ID] = new_value
-        return CounterUpdate(
-            poll_id=poll_id,
-            option=option,
-            node_id=NODE_ID,
-            value=new_value,
-        )
-
+    return CounterUpdate(
+        poll_id=poll_id,
+        option=option,
+        node_id=node_id,
+        value=new_value,
+    )
 
 def would_change_update(upd: CounterUpdate) -> bool:
     with state_lock:
-        ensure_option(upd.poll_id, upd.option)
-        prev = g_counter[upd.poll_id][upd.option].get(upd.node_id, 0)
+        prev = (
+            g_counter
+            .get(upd.poll_id, {})
+            .get(upd.option, {})
+            .get(upd.node_id, 0)
+        )
         return upd.value > prev
-
 
 def apply_update(upd: CounterUpdate) -> bool:
     """
@@ -82,7 +62,6 @@ def apply_update(upd: CounterUpdate) -> bool:
 def export_poll_state(poll_id: str) -> PollCRDTState:
     with state_lock:
         poll_data = g_counter.get(poll_id, {})
-        ensure_poll(poll_id)
         counts = {opt: dict(nodes) for opt, nodes in poll_data.items()}
         return PollCRDTState(counts=counts)
 
